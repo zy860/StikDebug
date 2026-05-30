@@ -1572,7 +1572,7 @@ struct LocationSimulationView: View {
 
     private func locationUpdateCode(for coordinate: CLLocationCoordinate2D) -> Int32 {
         let wgs84 = CoordinateTransform.gcj02ToWGS84(coordinate)
-        simulate_location(deviceIP, wgs84.latitude, wgs84.longitude, pairingFilePath)
+        return simulate_location(deviceIP, wgs84.latitude, wgs84.longitude, pairingFilePath)
     }
 }
 
