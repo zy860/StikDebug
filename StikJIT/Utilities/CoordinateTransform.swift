@@ -9,31 +9,39 @@ enum CoordinateTransform {
     static func wgs84ToGCJ02(_ coordinate: CLLocationCoordinate2D) -> CLLocationCoordinate2D {
         let lat = coordinate.latitude
         let lon = coordinate.longitude
-
-        guard outOfChina(lat: lat, lon: lon) else {
-            let dLat = transformLat(x: lon - 105.0, y: lat - 35.0)
-            let dLon = transformLon(x: lon - 105.0, y: lat - 35.0)
-            let radLat = lat / 180.0 * pi
-            let sinRadLat = sin(radLat)
-            let magic = 1 - ee * sinRadLat * sinRadLat
-            let sqrtMagic = sqrt(magic)
-            let adjustedLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * pi)
-            let adjustedLon = (dLon * 180.0) / (a / sqrtMagic * cos(radLat) * pi)
-            return CLLocationCoordinate2D(
-                latitude: lat + adjustedLat,
-                longitude: lon + adjustedLon
-            )
-        }
-
-        return coordinate
+        let dLat = transformLat(x: lon - 105.0, y: lat - 35.0)
+        let dLon = transformLon(x: lon - 105.0, y: lat - 35.0)
+        let radLat = lat / 180.0 * pi
+        let sinRadLat = sin(radLat)
+        let magic = 1 - ee * sinRadLat * sinRadLat
+        let sqrtMagic = sqrt(magic)
+        let adjustedLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * pi)
+        let adjustedLon = (dLon * 180.0) / (a / sqrtMagic * cos(radLat) * pi)
+        return CLLocationCoordinate2D(
+            latitude: lat + adjustedLat,
+            longitude: lon + adjustedLon
+        )
     }
 
     static func wgs84ToGCJ02(_ coordinates: [CLLocationCoordinate2D]) -> [CLLocationCoordinate2D] {
         coordinates.map { wgs84ToGCJ02($0) }
     }
 
-    private static func outOfChina(lat: Double, lon: Double) -> Bool {
-        return !(72.004 <= lon && lon <= 137.8347 && 0.8293 <= lat && lat <= 55.8271)
+    static func gcj02ToWGS84(_ coordinate: CLLocationCoordinate2D) -> CLLocationCoordinate2D {
+        let gcjLat = coordinate.latitude
+        let gcjLon = coordinate.longitude
+        let dLat = transformLat(x: gcjLon - 105.0, y: gcjLat - 35.0)
+        let dLon = transformLon(x: gcjLon - 105.0, y: gcjLat - 35.0)
+        let radLat = gcjLat / 180.0 * pi
+        let sinRadLat = sin(radLat)
+        let magic = 1 - ee * sinRadLat * sinRadLat
+        let sqrtMagic = sqrt(magic)
+        let adjustedLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * pi)
+        let adjustedLon = (dLon * 180.0) / (a / sqrtMagic * cos(radLat) * pi)
+        return CLLocationCoordinate2D(
+            latitude: gcjLat - adjustedLat,
+            longitude: gcjLon - adjustedLon
+        )
     }
 
     private static func transformLat(x: Double, y: Double) -> Double {

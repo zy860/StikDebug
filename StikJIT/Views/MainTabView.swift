@@ -134,10 +134,11 @@ struct MainTabView: View {
         }
 
         LocationSimulationCommandQueue.shared.async {
+            let wgs84 = CoordinateTransform.gcj02ToWGS84(coordinate)
             let code = simulate_location(
                 DeviceConnectionContext.targetIPAddress,
-                coordinate.latitude,
-                coordinate.longitude,
+                wgs84.latitude,
+                wgs84.longitude,
                 pairingFile.path
             )
 
