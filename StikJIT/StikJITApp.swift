@@ -159,6 +159,8 @@ struct HeartbeatApp: App {
     var body: some Scene {
         WindowGroup {
             MainTabView()
+                .environment(LanguageManager.shared)
+                .id(LanguageManager.shared.language)
                 .onAppear {
                     Task {
                         let fileManager = FileManager.default

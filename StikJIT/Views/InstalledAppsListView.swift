@@ -133,8 +133,8 @@ private enum AppListTab: Int, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .debuggable: return "JIT"
-        case .launch: return "Other"
+        case .debuggable: return "JIT".localized
+        case .launch: return "Other".localized
         }
     }
 }
@@ -186,7 +186,7 @@ private enum AppListTab: Int, CaseIterable, Identifiable {
                     }
                     if showDoneButton {
                         ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Done") { dismiss() }.fontWeight(.semibold)
+                            Button("Done".localized) { dismiss() }.fontWeight(.semibold)
                         }
                     } else {
                         ToolbarItem(placement: .navigationBarTrailing) {
@@ -580,7 +580,7 @@ struct AppButton: View {
         .contextMenu {
             Button(action: toggleFavorite) {
                 Label(
-                    favoriteApps.contains(bundleID) ? "Remove Favorite" : "Add to Favorites",
+                    favoriteApps.contains(bundleID) ? "Remove Favorite".localized : "Add to Favorites".localized,
                     systemImage: favoriteApps.contains(bundleID) ? "star.slash" : "star"
                 )
                 .disabled(!favoriteApps.contains(bundleID) && favoriteApps.count >= 4)
@@ -588,17 +588,17 @@ struct AppButton: View {
             Button {
                 copyBundleID()
             } label: {
-                Label("Copy Bundle ID", systemImage: "doc.on.doc")
+                Label("Copy Bundle ID".localized, systemImage: "doc.on.doc")
             }
             if enableAdvancedOptions {
                 Button { showScriptPicker = true } label: {
-                    Label("Assign Script", systemImage: "chevron.left.slash.chevron.right")
+                    Label("Assign Script".localized, systemImage: "chevron.left.slash.chevron.right")
                 }
                 if assignedScriptName != nil {
                     Button {
                         resetScriptAssignment()
                     } label: {
-                        Label("Reset Script", systemImage: "arrow.uturn.left")
+                        Label("Reset Script".localized, systemImage: "arrow.uturn.left")
                     }
                 }
             }
@@ -607,14 +607,14 @@ struct AppButton: View {
             Button {
                 toggleFavorite()
             } label: {
-                Label(favoriteApps.contains(bundleID) ? "Unfavorite" : "Favorite", systemImage: "star")
+                Label(favoriteApps.contains(bundleID) ? "Unfavorite".localized : "Favorite".localized, systemImage: "star")
             }
             .tint(.yellow)
 
             Button {
                 copyBundleID()
             } label: {
-                Label("Copy ID", systemImage: "doc.on.doc")
+                Label("Copy ID".localized, systemImage: "doc.on.doc")
             }
         }
         .sheet(isPresented: $showScriptPicker) {

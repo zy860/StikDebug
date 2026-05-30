@@ -220,7 +220,7 @@ struct HomeView: View {
                 ConsoleLogsView()
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button("Close") {
+                            Button("Close".localized) {
                                 isShowingConsole = false
                             }
                         }
@@ -233,7 +233,7 @@ struct HomeView: View {
                     RunJSView(model: jsModel)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
-                                Button("Done") { scriptViewShow = false }
+                                Button("Done".localized) { scriptViewShow = false }
                             }
                         }
                         .navigationTitle(selectedScript)

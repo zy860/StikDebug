@@ -18,6 +18,7 @@ struct SettingsView: View {
     @AppStorage("keepAliveAudio") private var keepAliveAudio = true
     @AppStorage("keepAliveLocation") private var keepAliveLocation = true
     @AppStorage("customTargetIP") private var customTargetIP = ""
+    @Environment(LanguageManager.self) private var langManager
 
     @State private var isShowingPairingFilePicker = false
     @State private var isImportingFile = false
@@ -54,15 +55,26 @@ struct SettingsView: View {
 
                 Section {
                     Link(destination: SettingsLinks.githubStars) {
-                        Label("Star on GitHub", systemImage: "star")
+                        Label("Star on GitHub".localized, systemImage: "star")
                     }
                 }
 
-                Section("Pairing File") {
+                Section("Language".localized) {
+                    Picker("Language".localized, selection: Binding(
+                        get: { langManager.language },
+                        set: { langManager.language = $0 }
+                    )) {
+                        Text("简体中文").tag("zh-Hans")
+                        Text("English").tag("en")
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Section("Pairing File".localized) {
                     Button {
                         isShowingPairingFilePicker = true
                     } label: {
-                        Label("Import Pairing File", systemImage: "doc.badge.plus")
+                        Label("Import Pairing File".localized, systemImage: "doc.badge.plus")
                     }
                     .disabled(isImportingFile)
 
@@ -70,7 +82,7 @@ struct SettingsView: View {
                         HStack(spacing: 10) {
                             ProgressView()
                                 .controlSize(.small)
-                            Text("Importing pairing file…")
+                            Text("Importing pairing file…".localized)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -87,8 +99,8 @@ struct SettingsView: View {
                 Section {
                     Toggle(isOn: $keepAliveAudio) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Silent Audio")
-                            Text("Plays inaudible audio so iOS keeps the app running.")
+                            Text("Silent Audio".localized)
+                            Text("Plays inaudible audio so iOS keeps the app running.".localized)
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -99,8 +111,8 @@ struct SettingsView: View {
 
                     Toggle(isOn: $keepAliveLocation) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Background Location")
-                            Text("Uses low-accuracy location to stay alive when an activity needs it.")
+                            Text("Background Location".localized)
+                            Text("Uses low-accuracy location to stay alive when an activity needs it.".localized)
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -109,22 +121,22 @@ struct SettingsView: View {
                     }
 
                 } header: {
-                    Text("Background Keep-Alive")
+                    Text("Background Keep-Alive".localized)
                 }
 
-                Section("Behavior") {
+                Section("Behavior".localized) {
                     Toggle(isOn: $overrideTXMDetection) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Always Run Scripts")
-                            Text("Treats device as TXM-capable to bypass hardware checks.")
+                            Text("Always Run Scripts".localized)
+                            Text("Treats device as TXM-capable to bypass hardware checks.".localized)
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
 
-                Section("Advanced") {
+                Section("Advanced".localized) {
                     HStack {
-                        Text("Target Device IP")
+                        Text("Target Device IP".localized)
                         Spacer()
                         TextField("10.7.0.1", text: $customTargetIP)
                             .multilineTextAlignment(.trailing)
@@ -132,10 +144,10 @@ struct SettingsView: View {
                             .submitLabel(.done)
                     }
                     Button { openAppFolder() } label: {
-                        Label("App Folder", systemImage: "folder")
+                        Label("App Folder".localized, systemImage: "folder")
                     }.foregroundStyle(.primary)
                     Button { showDDIConfirmation = true } label: {
-                        Label("Redownload DDI", systemImage: "arrow.down.circle")
+                        Label("Redownload DDI".localized, systemImage: "arrow.down.circle")
                     }.foregroundStyle(.primary).disabled(isRedownloadingDDI)
                     if isRedownloadingDDI {
                         VStack(alignment: .leading, spacing: 4) {
@@ -147,15 +159,15 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Help") {
+                Section("Help".localized) {
                     Link(destination: SettingsLinks.pairingFileGuide) {
-                        Label("Pairing File Guide", systemImage: "questionmark.circle")
+                        Label("Pairing File Guide".localized, systemImage: "questionmark.circle")
                     }
                     Link(destination: SettingsLinks.localDevVPN) {
-                        Label("Download LocalDevVPN", systemImage: "arrow.down.circle")
+                        Label("Download LocalDevVPN".localized, systemImage: "arrow.down.circle")
                     }
                     Link(destination: SettingsLinks.discord) {
-                        Label("Discord Support", systemImage: "bubble.left.and.bubble.right")
+                        Label("Discord Support".localized, systemImage: "bubble.left.and.bubble.right")
                     }
                 }
 
@@ -166,7 +178,7 @@ struct SettingsView: View {
                         .listRowBackground(Color.clear)
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle("Settings".localized)
         }
         .fileImporter(
             isPresented: $isShowingPairingFilePicker,
@@ -184,27 +196,27 @@ struct SettingsView: View {
                 do {
                     try PairingFileStore.importFromPicker(url, fileManager: fileManager)
                     isImportingFile = false
-                    pairingImportMessage = ("Imported successfully", false)
+                    pairingImportMessage = ("Imported successfully".localized, false)
                     startTunnelInBackground()
                     schedulePairingStatusDismiss()
                 } catch {
                     isImportingFile = false
-                    pairingImportMessage = ("Import failed: \(error.localizedDescription)", true)
+                    pairingImportMessage = (String(format: "Import failed: %@".localized, error.localizedDescription), true)
                     schedulePairingStatusDismiss()
                 }
             case .failure(let error):
                 isImportingFile = false
-                pairingImportMessage = ("Import failed: \(error.localizedDescription)", true)
+                pairingImportMessage = (String(format: "Import failed: %@".localized, error.localizedDescription), true)
                 schedulePairingStatusDismiss()
             }
         }
-        .confirmationDialog("Redownload DDI Files?", isPresented: $showDDIConfirmation, titleVisibility: .visible) {
-            Button("Redownload", role: .destructive) {
+        .confirmationDialog("Redownload DDI Files?".localized, isPresented: $showDDIConfirmation, titleVisibility: .visible) {
+            Button("Redownload".localized, role: .destructive) {
                 redownloadDDIPressed()
             }
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel".localized, role: .cancel) { }
         } message: {
-            Text("Existing DDI files will be removed before downloading fresh copies.")
+            Text("Existing DDI files will be removed before downloading fresh copies.".localized)
         }
     }
 
@@ -235,7 +247,7 @@ struct SettingsView: View {
             await MainActor.run {
                 isRedownloadingDDI = true
                 ddiDownloadProgress = 0
-                ddiStatusMessage = "Preparing download…"
+                ddiStatusMessage = "Preparing download…".localized
                 ddiResultMessage = nil
             }
             do {
@@ -247,12 +259,12 @@ struct SettingsView: View {
                 }
                 await MainActor.run {
                     isRedownloadingDDI = false
-                    ddiResultMessage = ("DDI files refreshed successfully.", false)
+                    ddiResultMessage = ("DDI files refreshed successfully.".localized, false)
                 }
             } catch {
                 await MainActor.run {
                     isRedownloadingDDI = false
-                    ddiResultMessage = ("Failed to redownload DDI files: \(error.localizedDescription)", true)
+                    ddiResultMessage = (String(format: "Failed to redownload DDI files: %@".localized, error.localizedDescription), true)
                 }
             }
         }
