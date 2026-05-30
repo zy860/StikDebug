@@ -1142,7 +1142,9 @@ struct LocationSimulationView: View {
     ) {
         guard !isRouteRunning else { return }
 
-        let coordinates = importedCoordinates.filter(CLLocationCoordinate2DIsValid)
+        let coordinates = CoordinateTransform.wgs84ToGCJ02(
+            importedCoordinates.filter(CLLocationCoordinate2DIsValid)
+        )
         guard let firstCoordinate = coordinates.first else {
             showImportError(CoordinateImportError.noCoordinates)
             return
