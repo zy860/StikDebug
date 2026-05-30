@@ -1,0 +1,65 @@
+name: Release IPA
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    name: Build & Release IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: 1. Fetch Source Code
+        uses: actions/checkout@v4
+
+      - name: 2. Configure Xcode Environment
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.0.1'
+
+      - name: 3. Compile Project Archive
+        run: |
+          xcodebuild clean archive \
+            -project StikDebug.xcodeproj \
+            -scheme "StikDebug" \
+            -configuration Debug \
+            -archivePath build/StikDebug.xcarchive \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            SWIFT_OPTIMIZATION_LEVEL="-Onone" \
+            IPHONEOS_DEPLOYMENT_TARGET=17.4
+
+      - name: 4. Package .app into .ipa
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          IPA_NAME="StikDebug-${VERSION}.ipa"
+          cp -R build/StikDebug.xcarchive/Products/Applications/StikDebug.app .
+          mkdir -p Payload
+          cp -R StikDebug.app Payload/
+          zip -r "${IPA_NAME}" Payload
+          rm -rf Payload StikDebug.app
+          echo "IPA_NAME=${IPA_NAME}" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: 5. Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "StikDebug v${{ env.VERSION }}"
+          prerelease: false
+          files: |
+            ${{ env.IPA_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
