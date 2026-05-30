@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Foundation
+import CoreLocation
 
 extension Notification.Name {
     static let switchToTab = Notification.Name("MainTabSwitchNotification")
@@ -134,7 +135,8 @@ struct MainTabView: View {
         }
 
         LocationSimulationCommandQueue.shared.async {
-            let wgs84 = CoordinateTransform.gcj02ToWGS84(coordinate)
+            let input = CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            let wgs84 = CoordinateTransform.gcj02ToWGS84(input)
             let code = simulate_location(
                 DeviceConnectionContext.targetIPAddress,
                 wgs84.latitude,
