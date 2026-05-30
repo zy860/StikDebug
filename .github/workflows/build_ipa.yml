@@ -44,18 +44,21 @@ jobs:
 
       - name: 4. Package .app into .ipa
         run: |
+          TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+          IPA_NAME="StikDebug-${TIMESTAMP}.ipa"
           cp -R build/StikDebug.xcarchive/Products/Applications/StikDebug.app .
           mkdir -p Payload
           cp -R StikDebug.app Payload/
-          zip -r StikDebug.ipa Payload
+          zip -r "${IPA_NAME}" Payload
           rm -rf Payload StikDebug.app
+          echo "IPA_NAME=${IPA_NAME}" >> $GITHUB_ENV
 
       - name: 5. Store IPA as Workflow Artifact
         if: env.UPLOAD_IPA == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: StikDebug-Debug.ipa
-          path: StikDebug.ipa
+          name: ${{ env.IPA_NAME }}
+          path: ${{ env.IPA_NAME }}
           retention-days: 90
 
       - name: 6. Extract Version Information
@@ -75,6 +78,6 @@ jobs:
             Built from commit [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
           target_commitish: ${{ github.sha }}
           files: |
-            StikDebug.ipa
+            ${{ env.IPA_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
