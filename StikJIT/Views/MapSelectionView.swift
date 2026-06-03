@@ -752,6 +752,7 @@ struct LocationSimulationView: View {
     @State private var routePlaybackCoordinate: CLLocationCoordinate2D?
     @State private var simulatedCoordinate: CLLocationCoordinate2D?
     @State private var routeRequestID = UUID()
+    @State private var assumeGCJ02 = false
 
     private static let routeDurationFormatter: DateComponentsFormatter = {
         let formatter = DateComponentsFormatter()
@@ -965,13 +966,22 @@ struct LocationSimulationView: View {
                 }
                 .disabled(isBusy || isRouteRunning)
 
-                Button {
-                    showCoordinateImporter = true
+                Menu {
+                    Button {
+                        showCoordinateImporter = true
+                    } label: {
+                        Label("Import Coordinates", systemImage: "square.and.arrow.down")
+                    }
+                    .disabled(isBusy || isRouteRunning || isImportingCoordinates)
+                    
+                    Divider()
+                    
+                    Toggle(isOn: $assumeGCJ02) {
+                        Label("GCJ-02 (高德/腾讯)", systemImage: "mappin.and.ellipse")
+                    }
                 } label: {
                     Image(systemName: "square.and.arrow.down")
                 }
-                .disabled(isBusy || isRouteRunning || isImportingCoordinates)
-                .accessibilityLabel("Import Coordinates")
             }
             ToolbarItem(placement: .topBarTrailing) {
                 TextField("Search location...", text: $searchText)
@@ -1142,9 +1152,14 @@ struct LocationSimulationView: View {
     ) {
         guard !isRouteRunning else { return }
 
-        let coordinates = CoordinateTransform.wgs84ToGCJ02(
-            importedCoordinates.filter(CLLocationCoordinate2DIsValid)
-        )
+        let validCoordinates = importedCoordinates.filter(CLLocationCoordinate2DIsValid)
+        let coordinates: [CLLocationCoordinate2D]
+        
+        if assumeGCJ02 {
+            coordinates = validCoordinates
+        } else {
+            coordinates = CoordinateTransform.wgs84ToGCJ02(validCoordinates)
+        }
         guard let firstCoordinate = coordinates.first else {
             showImportError(CoordinateImportError.noCoordinates)
             return
