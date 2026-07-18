@@ -237,5 +237,7 @@ extension UserDefaults {
         static let bundleScriptMap = "BundleScriptMap"
         static let defaultScriptName = "DefaultScriptName"
         static let defaultScriptNameValue = "attachDetach.js"
+        static let lastSimulatedLatitude = "lastSimulatedLatitude"
+        static let lastSimulatedLongitude = "lastSimulatedLongitude"
     }
 }
