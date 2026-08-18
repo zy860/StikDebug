@@ -55,19 +55,31 @@ struct StikJITTests {
             for: .default
         )
 
-        #expect(configuration[StikDebugTunnelConfiguration.interfaceIPKey] == "10.7.1.1")
-        #expect(configuration[StikDebugTunnelConfiguration.peerIPKey] == "10.7.0.1")
+        #expect(configuration[StikDebugTunnelConfiguration.interfaceIPKey] == "10.7.1.1/32")
+        #expect(configuration[StikDebugTunnelConfiguration.peerIPKey] == "10.7.0.1/32")
         #expect(StikDebugVPNManager.providerBundleIdentifier == "com.stik.stikdebug.tunnel")
     }
 
     @Test func embeddedTunnelDefaultsMatchLocalDevVPNEndpoint() {
         let configuration = StikDebugTunnelConfiguration.default
 
-        #expect(configuration.interfaceIP == "10.7.1.1")
-        #expect(configuration.peerIP == "10.7.0.1")
+        #expect(configuration.interfaceIP == "10.7.1.1/32")
+        #expect(configuration.peerIP == "10.7.0.1/32")
         #expect(configuration.peerPrefixLength == 32)
-        #expect(configuration.providerConfiguration["interfaceIP"] == "10.7.1.1")
-        #expect(configuration.providerConfiguration["peerIP"] == "10.7.0.1")
+        #expect(configuration.providerConfiguration["TunnelIfaceIP"] == "10.7.1.1/32")
+        #expect(configuration.providerConfiguration["TunnelPeerIP"] == "10.7.0.1/32")
+    }
+
+    @Test func localDevVPNCoreParsesCIDREndpoints() {
+        let interfaceEndpoint = CIDREndpoint("10.7.1.1/32", defaultPrefix: 24)
+        let peerEndpoint = CIDREndpoint("10.7.0.1/32", defaultPrefix: 24)
+
+        #expect(interfaceEndpoint.ip == "10.7.1.1")
+        #expect(interfaceEndpoint.prefix == 32)
+        #expect(interfaceEndpoint.subnetMask == "255.255.255.255")
+        #expect(peerEndpoint.ip == "10.7.0.1")
+        #expect(peerEndpoint.prefix == 32)
+        #expect(peerEndpoint.subnetMask == "255.255.255.255")
     }
 
     @Test func ipv4PacketRewriterSwapsPacketEndpoints() {

@@ -90,7 +90,10 @@ final class StikDebugVPNManager: ObservableObject {
     private func ensureReadyOnce() throws {
         let configured = StikDebugTunnelConfiguration(
             interfaceIP: StikDebugTunnelConfiguration.default.interfaceIP,
-            peerIP: DeviceConnectionContext.targetIPAddress
+            peerIP: CIDREndpoint(
+                DeviceConnectionContext.targetIPAddress,
+                defaultPrefix: 32
+            ).formattedCIDR
         )
         let managers = try loadManagers()
 

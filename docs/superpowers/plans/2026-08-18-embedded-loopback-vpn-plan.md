@@ -42,11 +42,11 @@ Add tests to `StikJITTests/StikJITTests.swift`:
 @Test func embeddedTunnelDefaultsMatchLocalDevVPNEndpoint() {
     let configuration = StikDebugTunnelConfiguration.default
 
-    #expect(configuration.interfaceIP == "10.7.1.1")
-    #expect(configuration.peerIP == "10.7.0.1")
+    #expect(configuration.interfaceIP == "10.7.1.1/32")
+    #expect(configuration.peerIP == "10.7.0.1/32")
     #expect(configuration.peerPrefixLength == 32)
-    #expect(configuration.providerConfiguration["interfaceIP"] == "10.7.1.1")
-    #expect(configuration.providerConfiguration["peerIP"] == "10.7.0.1")
+    #expect(configuration.providerConfiguration["TunnelIfaceIP"] == "10.7.1.1/32")
+    #expect(configuration.providerConfiguration["TunnelPeerIP"] == "10.7.0.1/32")
 }
 
 @Test func ipv4PacketRewriterSwapsPacketEndpoints() {
@@ -82,7 +82,7 @@ Expected: compilation failure identifying the missing `StikDebugTunnelConfigurat
 
 - [ ] **Step 3: Implement the minimal pure types.**
 
-`StikDebugTunnelConfiguration` must store `interfaceIP`, `peerIP`, and `peerPrefixLength`, expose the constants `interfaceIPKey = "interfaceIP"` and `peerIPKey = "peerIP"`, and build a `[String: String]` provider dictionary. Its default must be interface `10.7.1.1`, peer `10.7.0.1`, prefix `32`.
+`StikDebugTunnelConfiguration` must store CIDR-formatted `interfaceIP`, `peerIP`, and `peerPrefixLength`, expose the LocalDevVPN-compatible constants `interfaceIPKey = "TunnelIfaceIP"` and `peerIPKey = "TunnelPeerIP"`, and build a `[String: String]` provider dictionary. Its default must be interface `10.7.1.1/32`, peer `10.7.0.1/32`, prefix `32`.
 
 `IPv4PacketRewriter.swapEndpoints` must return without modifying packets shorter than 20 bytes and must swap bytes 12–15 with bytes 16–19 for every IPv4 packet delivered by the peer-only route. It must not parse or rewrite IPv6 packets. This intentionally matches LocalDevVPN's packet loop; the route restriction ensures only loopback peer traffic enters the loop.
 
@@ -144,7 +144,7 @@ Add a `PBXNativeTarget` named `StikDebugTunnel` with product type `com.apple.pro
 
 `PacketTunnelProvider.startTunnel` must:
 
-1. Read `interfaceIP` and `peerIP` from `startTunnel(options:)`, falling back to `NETunnelProviderProtocol.providerConfiguration` and then `StikDebugTunnelConfiguration.default`.
+1. Read the LocalDevVPN-compatible CIDR `TunnelIfaceIP` and `TunnelPeerIP` values from `startTunnel(options:)`, falling back to `NETunnelProviderProtocol.providerConfiguration` and then `StikDebugTunnelConfiguration.default`; accept the legacy plain-IP keys while upgrading an existing profile.
 2. Configure `NEIPv4Settings(addresses:subnetMasks:)` using the interface IP and `/24` subnet mask.
 3. Set `includedRoutes` to one `NEIPv4Route` for the peer IP with subnet mask `255.255.255.255`.
 4. Set `excludedRoutes` to `[.default()]`.

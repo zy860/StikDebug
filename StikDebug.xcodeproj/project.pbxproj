@@ -11,6 +11,7 @@
 		68D569C02E1B415700A5BA36 /* LanguageSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 68D569BF2E1B415700A5BA36 /* LanguageSupport */; };
 		A1B2C3D40123456789ABC001 /* StikDebugTunnelConfiguration.swift in StikDebugTunnel Sources */ = {isa = PBXBuildFile; fileRef = A3B2C3D40123456789ABC003 /* StikDebugTunnelConfiguration.swift */; };
 		A1B2C3D40123456789ABC002 /* IPv4PacketRewriter.swift in StikDebugTunnel Sources */ = {isa = PBXBuildFile; fileRef = A3B2C3D40123456789ABC004 /* IPv4PacketRewriter.swift */; };
+		A1B2C3D40123456789ABC006 /* CIDREndpoint.swift in StikDebugTunnel Sources */ = {isa = PBXBuildFile; fileRef = A3B2C3D40123456789ABC006 /* CIDREndpoint.swift */; };
 		A1B2C3D40123456789ABC003 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3B2C3D40123456789ABC002 /* NetworkExtension.framework */; };
 		A1B2C3D40123456789ABC004 /* StikDebugTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A3B2C3D40123456789ABC001 /* StikDebugTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A1B2C3D40123456789ABC005 /* NetworkExtension.framework in StikDebug Frameworks */ = {isa = PBXBuildFile; fileRef = A3B2C3D40123456789ABC002 /* NetworkExtension.framework */; };
@@ -64,6 +65,7 @@
 		A3B2C3D40123456789ABC002 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 		A3B2C3D40123456789ABC003 /* StikDebugTunnelConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StikJIT/Tunnel/StikDebugTunnelConfiguration.swift; sourceTree = "<group>"; };
 		A3B2C3D40123456789ABC004 /* IPv4PacketRewriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StikJIT/Tunnel/IPv4PacketRewriter.swift; sourceTree = "<group>"; };
+		A3B2C3D40123456789ABC006 /* CIDREndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StikJIT/Tunnel/CIDREndpoint.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -155,6 +157,7 @@
 				A4B2C3D40123456789ABC001 /* StikDebugTunnel */,
 				A3B2C3D40123456789ABC003 /* StikDebugTunnelConfiguration.swift */,
 				A3B2C3D40123456789ABC004 /* IPv4PacketRewriter.swift */,
+				A3B2C3D40123456789ABC006 /* CIDREndpoint.swift */,
 				DC6F1D4B2D94EADF0071B2B6 /* StikJITTests */,
 				DC6F1D552D94EADF0071B2B6 /* StikJITUITests */,
 				DC6F1D752D94EB620071B2B6 /* Frameworks */,
@@ -391,6 +394,7 @@
 			files = (
 				A1B2C3D40123456789ABC001 /* StikDebugTunnelConfiguration.swift in StikDebugTunnel Sources */,
 				A1B2C3D40123456789ABC002 /* IPv4PacketRewriter.swift in StikDebugTunnel Sources */,
+				A1B2C3D40123456789ABC006 /* CIDREndpoint.swift in StikDebugTunnel Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

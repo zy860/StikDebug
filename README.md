@@ -33,6 +33,11 @@
 - **Processes:** Inspect running apps/processes and terminate them.
 - **Location Simulator:** Simulate the GPS location of your device.
 
+The embedded loopback VPN uses the point-to-point CIDR and packet-loop design from
+[LocalDevVPN](https://github.com/jkcoxson/LocalDevVPN), based on the original
+StosVPN implementation. The relevant attribution and license notice are retained
+in `StikJIT/Tunnel/CIDREndpoint.swift`.
+
 ## Download
 > [!NOTE]
 > **Notice:** StikDebug is no longer available on the App Store. Please use the official download methods below.

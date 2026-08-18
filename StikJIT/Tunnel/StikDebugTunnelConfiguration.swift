@@ -4,12 +4,16 @@
 //
 
 struct StikDebugTunnelConfiguration: Equatable {
-    static let interfaceIPKey = "interfaceIP"
-    static let peerIPKey = "peerIP"
+    // Match LocalDevVPN's provider keys. The legacy keys are still accepted
+    // by the packet provider so existing profiles can be upgraded in place.
+    static let interfaceIPKey = "TunnelIfaceIP"
+    static let peerIPKey = "TunnelPeerIP"
+    static let legacyInterfaceIPKey = "interfaceIP"
+    static let legacyPeerIPKey = "peerIP"
 
     static let `default` = StikDebugTunnelConfiguration(
-        interfaceIP: "10.7.1.1",
-        peerIP: "10.7.0.1"
+        interfaceIP: "10.7.1.1/32",
+        peerIP: "10.7.0.1/32"
     )
 
     let interfaceIP: String

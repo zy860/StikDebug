@@ -8,8 +8,8 @@ import Foundation
 import NetworkExtension
 
 final class PacketTunnelProvider: NEPacketTunnelProvider {
-    private var interfaceIP = StikDebugTunnelConfiguration.default.interfaceIP
-    private var peerIP = StikDebugTunnelConfiguration.default.peerIP
+    private var tunnelIfaceIP = StikDebugTunnelConfiguration.default.interfaceIP
+    private var tunnelPeerIP = StikDebugTunnelConfiguration.default.peerIP
     private var packetLoopActive = false
 
     override func startTunnel(
@@ -20,27 +20,35 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             (protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration
 
         if let value = options?[StikDebugTunnelConfiguration.interfaceIPKey] as? String
-            ?? providerConfiguration?[StikDebugTunnelConfiguration.interfaceIPKey] as? String {
-            interfaceIP = value
+            ?? providerConfiguration?[StikDebugTunnelConfiguration.interfaceIPKey] as? String
+            ?? options?[StikDebugTunnelConfiguration.legacyInterfaceIPKey] as? String
+            ?? providerConfiguration?[StikDebugTunnelConfiguration.legacyInterfaceIPKey] as? String {
+            tunnelIfaceIP = value
         }
         if let value = options?[StikDebugTunnelConfiguration.peerIPKey] as? String
-            ?? providerConfiguration?[StikDebugTunnelConfiguration.peerIPKey] as? String {
-            peerIP = value
+            ?? providerConfiguration?[StikDebugTunnelConfiguration.peerIPKey] as? String
+            ?? options?[StikDebugTunnelConfiguration.legacyPeerIPKey] as? String
+            ?? providerConfiguration?[StikDebugTunnelConfiguration.legacyPeerIPKey] as? String {
+            tunnelPeerIP = value
         }
 
+        let ifaceEndpoint = CIDREndpoint(tunnelIfaceIP, defaultPrefix: 32)
+        let peerEndpoint = CIDREndpoint(tunnelPeerIP, defaultPrefix: 32)
         let ipv4Settings = NEIPv4Settings(
-            addresses: [interfaceIP],
-            subnetMasks: ["255.255.255.255"]
+            addresses: [ifaceEndpoint.ip],
+            subnetMasks: [ifaceEndpoint.subnetMask]
         )
         ipv4Settings.includedRoutes = [
             NEIPv4Route(
-                destinationAddress: peerIP,
-                subnetMask: "255.255.255.255"
+                destinationAddress: peerEndpoint.ip,
+                subnetMask: peerEndpoint.subnetMask
             )
         ]
         ipv4Settings.excludedRoutes = [.default()]
 
-        let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: peerIP)
+        let settings = NEPacketTunnelNetworkSettings(
+            tunnelRemoteAddress: peerEndpoint.ip
+        )
         settings.ipv4Settings = ipv4Settings
 
         setTunnelNetworkSettings(settings) { [weak self] error in
@@ -55,7 +63,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             }
 
             packetLoopActive = true
-            readPackets()
+            setPackets()
             completionHandler(nil)
         }
     }
@@ -68,21 +76,34 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         completionHandler()
     }
 
-    private func readPackets() {
+    private func setPackets() {
         guard packetLoopActive else { return }
 
         packetFlow.readPackets { [weak self] packets, protocols in
             guard let self, self.packetLoopActive else { return }
 
-            let rewrittenPackets = IPv4PacketRewriter.rewritePackets(
-                packets,
-                protocols: protocols
-            )
+            var modified = packets
+            for index in modified.indices
+                where index < protocols.count
+                && protocols[index].int32Value == AF_INET
+                && modified[index].count >= 20 {
+                modified[index].withUnsafeMutableBytes { bytes in
+                    guard let pointer = bytes.baseAddress?.assumingMemoryBound(to: UInt32.self) else {
+                        return
+                    }
+
+                    let source = pointer[3]
+                    let destination = pointer[4]
+                    pointer[3] = destination
+                    pointer[4] = source
+                }
+            }
+
             self.packetFlow.writePackets(
-                rewrittenPackets,
+                modified,
                 withProtocols: protocols
             )
-            self.readPackets()
+            self.setPackets()
         }
     }
 }
