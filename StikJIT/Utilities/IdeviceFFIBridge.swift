@@ -755,6 +755,11 @@ enum LocationSimulationCommandQueue {
 }
 
 func simulate_location(_ deviceIP: String, _ latitude: Double, _ longitude: Double, _ pairingFile: String) -> Int32 {
+    if LocationSimulationState.locationSimulation != nil
+        && !StikDebugVPNManager.shared.isTunnelReady() {
+        LocationSimulationState.cleanup()
+    }
+
     if let locationSimulation = LocationSimulationState.locationSimulation {
         if let ffiError = location_simulation_set(locationSimulation, latitude, longitude) {
             idevice_error_free(ffiError)
@@ -764,48 +769,32 @@ func simulate_location(_ deviceIP: String, _ latitude: Double, _ longitude: Doub
         }
     }
 
-    var address = sockaddr_in()
-    address.sin_family = sa_family_t(AF_INET)
-    address.sin_port = in_port_t(49152).bigEndian
-
-    let inetResult = deviceIP.withCString { inet_pton(AF_INET, $0, &address.sin_addr) }
-    guard inetResult == 1 else {
-        return LocationSimulationStatus.invalidIP
-    }
-
-    var pairingHandle: OpaquePointer?
-    let pairingError = pairingFile.withCString { rp_pairing_file_read($0, &pairingHandle) }
-    if let pairingError {
-        idevice_error_free(pairingError)
-        return LocationSimulationStatus.pairingRead
-    }
-
-    guard let pairingHandle else {
-        return LocationSimulationStatus.pairingRead
-    }
-
-    defer { rp_pairing_file_free(pairingHandle) }
-
-    let providerError = withUnsafePointer(to: &address) { pointer in
-        pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-            tunnel_create_rppairing(
-                $0,
-                socklen_t(MemoryLayout<sockaddr_in>.stride),
-                "StikDebugLocation",
-                pairingHandle,
-                nil,
-                nil,
-                &LocationSimulationState.adapter,
-                &LocationSimulationState.handshake
-            )
+    var tunnel: RPPairingTunnel
+    do {
+        tunnel = try EmbeddedDeviceTransport.shared.makeRPPairingTunnel(
+            hostname: "StikDebugLocation",
+            targetIPAddress: deviceIP,
+            pairingFileURL: URL(fileURLWithPath: pairingFile)
+        )
+    } catch let error as DeviceTransportError {
+        switch error {
+        case .invalidIPAddress(_):
+            return LocationSimulationStatus.invalidIP
+        case .pairingFileMissing(_), .pairingFileReadFailed(_):
+            return LocationSimulationStatus.pairingRead
+        case .vpnUnavailable(_), .ffiFailure(_), .incompleteTunnel:
+            LocationSimulationState.cleanup()
+            return LocationSimulationStatus.providerCreate
         }
-    }
-
-    if let providerError {
-        idevice_error_free(providerError)
+    } catch {
         LocationSimulationState.cleanup()
         return LocationSimulationStatus.providerCreate
     }
+
+    LocationSimulationState.adapter = tunnel.adapter
+    LocationSimulationState.handshake = tunnel.handshake
+    tunnel.adapter = nil
+    tunnel.handshake = nil
 
     let remoteServerError = remote_server_connect_rsd(
         LocationSimulationState.adapter,
@@ -845,6 +834,11 @@ func simulate_location(_ deviceIP: String, _ latitude: Double, _ longitude: Doub
 }
 
 func clear_simulated_location() -> Int32 {
+    if !StikDebugVPNManager.shared.isTunnelReady() {
+        LocationSimulationState.cleanup()
+        return LocationSimulationStatus.locationClear
+    }
+
     guard let locationSimulation = LocationSimulationState.locationSimulation else {
         return LocationSimulationStatus.locationClear
     }
