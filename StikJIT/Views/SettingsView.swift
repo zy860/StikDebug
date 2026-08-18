@@ -227,7 +227,6 @@ struct SettingsView: View {
                     try PairingFileStore.importFromPicker(url, fileManager: fileManager)
                     isImportingFile = false
                     pairingImportMessage = ("Imported successfully".localized, false)
-                    startTunnelInBackground()
                     schedulePairingStatusDismiss()
                 } catch {
                     isImportingFile = false

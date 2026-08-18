@@ -235,9 +235,6 @@ private enum AppListTab: Int, CaseIterable, Identifiable {
         }
         .onChange(of: selectedTab) { _, _ in prefetchPriorityIcons() }
         .onChange(of: pinnedSystemApps) { _, _ in prefetchPriorityIcons() }
-        .onReceive(NotificationCenter.default.publisher(for: .pairingFileImported)) { _ in
-            viewModel.refreshAppLists()
-        }
     }
 
     // MARK: Apps List
@@ -291,6 +288,14 @@ private enum AppListTab: Int, CaseIterable, Identifiable {
                                  ? "Try a different name or bundle identifier.".localized
                                  : "StikDebug can only connect to apps with the \"get-task-allow\" entitlement.".localized)
                                 .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                            if !debuggableSearchIsActive {
+                                Button {
+                                    viewModel.refreshAppLists()
+                                } label: {
+                                    Label("Refresh Apps".localized, systemImage: "arrow.clockwise")
+                                }
+                                .buttonStyle(.bordered)
+                            }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
@@ -1184,7 +1189,6 @@ class InstalledAppsViewModel: ObservableObject {
 
     init() {
         loadCachedApps()
-        refreshAppLists()
     }
 
     func refreshAppLists() {

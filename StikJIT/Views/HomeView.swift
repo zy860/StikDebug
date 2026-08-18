@@ -86,9 +86,6 @@ struct HomeView: View {
     @State private var isShowingConsole = false
     @AppStorage(UserDefaults.Keys.defaultScriptName) var selectedScript = UserDefaults.Keys.defaultScriptNameValue
     @State var jsModel: RunJSViewModel?
-    @ObservedObject private var mounting = MountingProgress.shared
-
-    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     private struct DebugFeedback: Identifiable {
         let id = UUID()
@@ -111,8 +108,6 @@ struct HomeView: View {
             }
         }
         .onAppear {
-            startTunnelInBackground()
-            MountingProgress.shared.checkforMounted()
             viewDidAppeared = true
             if let config = pendingJITEnableConfiguration {
                 startJITInBackground(bundleID: config.bundleID, pid: config.pid, scriptData: config.scriptData, scriptName: config.scriptName, triggeredByURLScheme: true)
@@ -126,11 +121,6 @@ struct HomeView: View {
                 selectedScript = name
             }
             scriptViewShow = true
-        }
-        .onReceive(timer) { _ in
-            if mounting.mountingThread == nil && !mounting.coolisMounted {
-                MountingProgress.shared.checkforMounted()
-            }
         }
         .onOpenURL { url in
             guard let host = url.host()?.lowercased() else { return }
@@ -199,8 +189,6 @@ struct HomeView: View {
                 do {
                     try PairingFileStore.importFromPicker(url, fileManager: fileManager)
                     pubTunnelConnected = false
-                    startTunnelInBackground()
-                    NotificationCenter.default.post(name: .pairingFileImported, object: nil)
                     // Dismiss any existing connection error alert
                     if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                        let root = scene.windows.first?.rootViewController {

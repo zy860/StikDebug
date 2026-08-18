@@ -79,7 +79,7 @@ enum DeviceTransportError: LocalizedError, Equatable {
         case .ffiFailure(let message):
             return "RPPairing tunnel creation failed: \(message)"
         case .incompleteTunnel:
-            return "RPPairing returned incomplete tunnel handles"
+            return "RPPairing returned incomplete tunnel handles for \(DeviceConnectionContext.targetIPAddress):\(RPPairingEndpoint.port). The pairing file was read successfully; make sure the embedded VPN is connected."
         }
     }
 }
@@ -161,7 +161,9 @@ final class EmbeddedDeviceTransport: DeviceTransport {
         if let ffiError {
             let message = consumeFFIError(ffiError, fallback: "unknown RPPairing error")
             tunnel.free()
-            throw DeviceTransportError.ffiFailure(message)
+            throw DeviceTransportError.ffiFailure(
+                "\(message) [target \(endpoint.ip):\(endpoint.port)]. The pairing file was read successfully; make sure the embedded VPN is connected and the target device tunnel is listening."
+            )
         }
 
         guard tunnel.adapter != nil, tunnel.handshake != nil else {

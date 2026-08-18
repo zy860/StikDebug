@@ -30,8 +30,6 @@ private var tunnelPendingShowUI = true
 @main
 struct HeartbeatApp: App {
     @StateObject private var mount = MountingProgress.shared
-    @Environment(\.scenePhase) private var scenePhase   // Observe scene lifecycle
-    @State private var shouldAttemptTunnelReconnect = false
     
     init() {
         registerAdvancedOptionsDefault()
@@ -44,20 +42,6 @@ struct HeartbeatApp: App {
             method_exchangeImplementations(origMethod, fixMethod)
         }
         
-    }
-    
-    private func handleScenePhaseChange(_ newPhase: ScenePhase) {
-        switch newPhase {
-        case .background:
-            shouldAttemptTunnelReconnect = true
-        case .active:
-            if shouldAttemptTunnelReconnect {
-                shouldAttemptTunnelReconnect = false
-                startTunnelInBackground(showErrorUI: false)
-            }
-        default:
-            break
-        }
     }
     
     var body: some Scene {
@@ -84,9 +68,6 @@ struct HeartbeatApp: App {
                         }
                     }
                 }
-            .onChange(of: scenePhase) { _, newPhase in
-                handleScenePhaseChange(newPhase)
-            }
         }
 
     }
