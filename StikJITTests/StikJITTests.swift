@@ -31,6 +31,12 @@ struct StikJITTests {
         #expect(message.localizedCaseInsensitiveContains("vpn"))
     }
 
+    @Test func locationSimulationClassifiesTransportFailuresSeparately() {
+        #expect(LocationSimulationStatus.code(for: .vpnUnavailable("permission denied")) == 3)
+        #expect(LocationSimulationStatus.code(for: .ffiFailure("connection refused")) == 13)
+        #expect(LocationSimulationStatus.code(for: .incompleteTunnel) == 14)
+    }
+
     @Test func vpnStartErrorPreservesUnderlyingMessage() {
         let message = StikDebugVPNError.startFailed("permission denied").errorDescription ?? ""
 

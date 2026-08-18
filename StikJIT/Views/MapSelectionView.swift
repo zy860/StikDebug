@@ -1422,7 +1422,12 @@ struct LocationSimulationView: View {
                     onSuccess()
                 } else {
                     alertTitle = errorTitle
-                    alertMessage = errorMessage(code)
+                    let baseMessage = errorMessage(code)
+                    if let detail = locationSimulationLastErrorMessage(), !detail.isEmpty {
+                        alertMessage = "\(baseMessage)\n\n\(detail)"
+                    } else {
+                        alertMessage = baseMessage
+                    }
                     showAlert = true
                 }
             }

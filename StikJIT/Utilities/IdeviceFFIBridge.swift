@@ -713,15 +713,32 @@ final class CMSDecoderHelper: NSObject {
     }
 }
 
-private enum LocationSimulationStatus {
+enum LocationSimulationStatus {
     static let ok: Int32 = 0
     static let invalidIP: Int32 = 1
     static let pairingRead: Int32 = 2
     static let providerCreate: Int32 = 3
+    static let ffiFailure: Int32 = 13
+    static let incompleteTunnel: Int32 = 14
     static let remoteServer: Int32 = 9
     static let locationSimulation: Int32 = 10
     static let locationSet: Int32 = 11
     static let locationClear: Int32 = 12
+
+    static func code(for error: DeviceTransportError) -> Int32 {
+        switch error {
+        case .invalidIPAddress:
+            return invalidIP
+        case .pairingFileMissing, .pairingFileReadFailed:
+            return pairingRead
+        case .vpnUnavailable:
+            return providerCreate
+        case .ffiFailure:
+            return ffiFailure
+        case .incompleteTunnel:
+            return incompleteTunnel
+        }
+    }
 }
 
 private enum LocationSimulationState {
@@ -729,6 +746,7 @@ private enum LocationSimulationState {
     static var handshake: OpaquePointer?
     static var remoteServer: OpaquePointer?
     static var locationSimulation: OpaquePointer?
+    static var lastErrorMessage: String?
 
     static func cleanup() {
         if let locationSimulation {
@@ -750,11 +768,24 @@ private enum LocationSimulationState {
     }
 }
 
+func locationSimulationLastErrorMessage() -> String? {
+    LocationSimulationState.lastErrorMessage
+}
+
+@discardableResult
+private func recordLocationSimulationFailure(_ code: Int32, message: String) -> Int32 {
+    LocationSimulationState.lastErrorMessage = message
+    LogManager.shared.addErrorLog(message)
+    return code
+}
+
 enum LocationSimulationCommandQueue {
     static let shared = DispatchQueue(label: "com.stik.location-sim", qos: .userInitiated)
 }
 
 func simulate_location(_ deviceIP: String, _ latitude: Double, _ longitude: Double, _ pairingFile: String) -> Int32 {
+    LocationSimulationState.lastErrorMessage = nil
+
     if LocationSimulationState.locationSimulation != nil
         && !StikDebugVPNManager.shared.isTunnelReady() {
         LocationSimulationState.cleanup()
@@ -762,8 +793,10 @@ func simulate_location(_ deviceIP: String, _ latitude: Double, _ longitude: Doub
 
     if let locationSimulation = LocationSimulationState.locationSimulation {
         if let ffiError = location_simulation_set(locationSimulation, latitude, longitude) {
+            let message = String(validatingUTF8: ffiError.pointee.message) ?? "Failed to update simulated location"
             idevice_error_free(ffiError)
             LocationSimulationState.cleanup()
+            return recordLocationSimulationFailure(LocationSimulationStatus.locationSet, message: message)
         } else {
             return LocationSimulationStatus.ok
         }
@@ -777,18 +810,17 @@ func simulate_location(_ deviceIP: String, _ latitude: Double, _ longitude: Doub
             pairingFileURL: URL(fileURLWithPath: pairingFile)
         )
     } catch let error as DeviceTransportError {
-        switch error {
-        case .invalidIPAddress(_):
-            return LocationSimulationStatus.invalidIP
-        case .pairingFileMissing(_), .pairingFileReadFailed(_):
-            return LocationSimulationStatus.pairingRead
-        case .vpnUnavailable(_), .ffiFailure(_), .incompleteTunnel:
-            LocationSimulationState.cleanup()
-            return LocationSimulationStatus.providerCreate
-        }
+        LocationSimulationState.cleanup()
+        return recordLocationSimulationFailure(
+            LocationSimulationStatus.code(for: error),
+            message: error.localizedDescription
+        )
     } catch {
         LocationSimulationState.cleanup()
-        return LocationSimulationStatus.providerCreate
+        return recordLocationSimulationFailure(
+            LocationSimulationStatus.providerCreate,
+            message: "Location transport failed: \(error.localizedDescription)"
+        )
     }
 
     LocationSimulationState.adapter = tunnel.adapter
@@ -802,9 +834,10 @@ func simulate_location(_ deviceIP: String, _ latitude: Double, _ longitude: Doub
         &LocationSimulationState.remoteServer
     )
     if let remoteServerError {
+        let message = String(validatingUTF8: remoteServerError.pointee.message) ?? "Failed to connect to the device RSD service"
         idevice_error_free(remoteServerError)
         LocationSimulationState.cleanup()
-        return LocationSimulationStatus.remoteServer
+        return recordLocationSimulationFailure(LocationSimulationStatus.remoteServer, message: message)
     }
 
     let locationSimulationError = location_simulation_new(
@@ -812,9 +845,10 @@ func simulate_location(_ deviceIP: String, _ latitude: Double, _ longitude: Doub
         &LocationSimulationState.locationSimulation
     )
     if let locationSimulationError {
+        let message = String(validatingUTF8: locationSimulationError.pointee.message) ?? "Failed to create the location simulation service"
         idevice_error_free(locationSimulationError)
         LocationSimulationState.cleanup()
-        return LocationSimulationStatus.locationSimulation
+        return recordLocationSimulationFailure(LocationSimulationStatus.locationSimulation, message: message)
     }
 
     LocationSimulationState.remoteServer = nil
@@ -825,18 +859,25 @@ func simulate_location(_ deviceIP: String, _ latitude: Double, _ longitude: Doub
         longitude
     )
     if let locationSetError {
+        let message = String(validatingUTF8: locationSetError.pointee.message) ?? "Failed to set the simulated location"
         idevice_error_free(locationSetError)
         LocationSimulationState.cleanup()
-        return LocationSimulationStatus.locationSet
+        return recordLocationSimulationFailure(LocationSimulationStatus.locationSet, message: message)
     }
 
+    LocationSimulationState.lastErrorMessage = nil
     return LocationSimulationStatus.ok
 }
 
 func clear_simulated_location() -> Int32 {
+    LocationSimulationState.lastErrorMessage = nil
+
     if !StikDebugVPNManager.shared.isTunnelReady() {
         LocationSimulationState.cleanup()
-        return LocationSimulationStatus.locationClear
+        return recordLocationSimulationFailure(
+            LocationSimulationStatus.locationClear,
+            message: "The embedded VPN is not connected; the location simulation handle was released without contacting the device."
+        )
     }
 
     guard let locationSimulation = LocationSimulationState.locationSimulation else {
@@ -847,8 +888,9 @@ func clear_simulated_location() -> Int32 {
     LocationSimulationState.cleanup()
 
     if let ffiError {
+        let message = String(validatingUTF8: ffiError.pointee.message) ?? "Failed to clear the simulated location"
         idevice_error_free(ffiError)
-        return LocationSimulationStatus.locationClear
+        return recordLocationSimulationFailure(LocationSimulationStatus.locationClear, message: message)
     }
 
     return LocationSimulationStatus.ok
