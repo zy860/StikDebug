@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Darwin
 import Testing
 @testable import StikDebug
 
@@ -94,6 +95,25 @@ struct StikJITTests {
         IPv4PacketRewriter.swapEndpoints(in: &packet)
 
         #expect(packet == original)
+    }
+
+    @Test func ipv4PacketRewriterPreservesAllPacketsAndProtocols() {
+        var ipv4Packet = [UInt8](repeating: 0, count: 20)
+        ipv4Packet[0] = 0x45
+        ipv4Packet.replaceSubrange(12..<16, with: [10, 7, 0, 2])
+        ipv4Packet.replaceSubrange(16..<20, with: [10, 7, 0, 1])
+
+        let nonIPv4Packet = Data([0x60] + [UInt8](repeating: 0, count: 19))
+        let shortPacket = Data([0x45] + [UInt8](repeating: 0, count: 18))
+        let packets = [Data(ipv4Packet), nonIPv4Packet, shortPacket]
+        let protocols = [NSNumber(value: AF_INET), NSNumber(value: 999), NSNumber(value: AF_INET)]
+
+        let rewritten = IPv4PacketRewriter.rewritePackets(packets, protocols: protocols)
+
+        #expect(rewritten.count == packets.count)
+        #expect(rewritten[0] != packets[0])
+        #expect(rewritten[1] == nonIPv4Packet)
+        #expect(rewritten[2] == shortPacket)
     }
 
     @Test func txmDetectionIgnoresFirmwareFileBeforeIOS26() async throws {

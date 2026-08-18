@@ -74,24 +74,14 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         packetFlow.readPackets { [weak self] packets, protocols in
             guard let self, self.packetLoopActive else { return }
 
-            var rewrittenPackets: [Data] = []
-            var rewrittenProtocols: [NSNumber] = []
-            for (packet, proto) in zip(packets, protocols) {
-                guard proto.int32Value == AF_INET else { continue }
-
-                var bytes = [UInt8](packet)
-                guard IPv4PacketRewriter.isIPv4Packet(bytes) else { continue }
-                IPv4PacketRewriter.swapEndpoints(in: &bytes)
-                rewrittenPackets.append(Data(bytes))
-                rewrittenProtocols.append(proto)
-            }
-
-            if !rewrittenPackets.isEmpty {
-                self.packetFlow.writePackets(
-                    rewrittenPackets,
-                    withProtocols: rewrittenProtocols
-                )
-            }
+            let rewrittenPackets = IPv4PacketRewriter.rewritePackets(
+                packets,
+                protocols: protocols
+            )
+            self.packetFlow.writePackets(
+                rewrittenPackets,
+                withProtocols: protocols
+            )
             self.readPackets()
         }
     }
