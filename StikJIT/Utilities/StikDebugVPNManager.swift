@@ -96,10 +96,12 @@ final class StikDebugVPNManager: ObservableObject {
             ).formattedCIDR
         )
         let managers = try loadManagers()
+        let ownedManagers = managers.filter(isOwned)
 
         let selectedManager: NETunnelProviderManager
-        if let existing = managers.first(where: isOwned) {
+        if let existing = ownedManagers.first(where: isActive) ?? ownedManagers.first {
             selectedManager = existing
+            removeDuplicateManagers(ownedManagers, keeping: existing)
             try reload(existing)
         } else {
             selectedManager = NETunnelProviderManager()
@@ -154,6 +156,7 @@ final class StikDebugVPNManager: ObservableObject {
         protocolConfiguration.providerConfiguration = configuration.providerConfiguration.reduce(into: [String: Any]()) {
             $0[$1.key] = $1.value
         }
+        protocolConfiguration.disconnectOnSleep = false
         manager.protocolConfiguration = protocolConfiguration
         manager.localizedDescription = "StikDebug Local Tunnel"
 
@@ -161,6 +164,18 @@ final class StikDebugVPNManager: ObservableObject {
         // matching is not reliable. Start explicitly from the transport layer.
         manager.onDemandRules = nil
         manager.isOnDemandEnabled = false
+    }
+
+    private func removeDuplicateManagers(
+        _ managers: [NETunnelProviderManager],
+        keeping selectedManager: NETunnelProviderManager
+    ) {
+        for duplicate in managers where duplicate !== selectedManager {
+            if isActive(duplicate) {
+                duplicate.connection.stopVPNTunnel()
+            }
+            duplicate.removeFromPreferences { _ in }
+        }
     }
 
     private func isOwned(_ manager: NETunnelProviderManager) -> Bool {

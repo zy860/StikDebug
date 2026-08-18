@@ -37,6 +37,29 @@ struct RPPairingEndpoint {
     }
 }
 
+enum RPPairingRecoveryPolicy {
+    static let maximumAttempts = 2
+    static let retryDelay: TimeInterval = 0.35
+
+    static func shouldRetry(_ message: String) -> Bool {
+        let normalized = message.lowercased()
+        return normalized.contains("connection reset by peer")
+            || normalized.contains("os error 54")
+            || normalized.contains("code: 54")
+    }
+
+    static func failureSuffix(
+        for message: String,
+        recoveryRetried: Bool = false
+    ) -> String {
+        if shouldRetry(message) || recoveryRetried {
+            return " The embedded VPN route reached the device, but the device reset the RPPairing handshake. A recovery retry was attempted; if this persists, refresh the RPPairing pairing file and confirm the device is unlocked and trusted."
+        }
+
+        return " The pairing file was read successfully; make sure the embedded VPN is connected and the target device tunnel is listening."
+    }
+}
+
 struct RPPairingTunnel {
     var adapter: OpaquePointer?
     var handshake: OpaquePointer?
@@ -121,57 +144,82 @@ final class EmbeddedDeviceTransport: DeviceTransport {
 
         let endpoint = try RPPairingEndpoint(ip: targetIPAddress)
 
-        var pairingFile: OpaquePointer?
-        let pairingError = pairingFileURL.path.withCString { path in
-            rp_pairing_file_read(path, &pairingFile)
-        }
-        if let pairingError {
-            if let pairingFile {
-                rp_pairing_file_free(pairingFile)
+        var recoveryRetried = false
+        for attempt in 0 ..< RPPairingRecoveryPolicy.maximumAttempts {
+            var pairingFile: OpaquePointer?
+            let pairingError = pairingFileURL.path.withCString { path in
+                rp_pairing_file_read(path, &pairingFile)
             }
-            throw DeviceTransportError.pairingFileReadFailed(
-                consumeFFIError(pairingError, fallback: "unknown pairing-file error")
-            )
-        }
+            if let pairingError {
+                if let pairingFile {
+                    rp_pairing_file_free(pairingFile)
+                }
+                throw DeviceTransportError.pairingFileReadFailed(
+                    consumeFFIError(pairingError, fallback: "unknown pairing-file error")
+                )
+            }
 
-        guard let pairingFile else {
-            throw DeviceTransportError.pairingFileReadFailed("empty pairing handle")
-        }
-        defer { rp_pairing_file_free(pairingFile) }
+            guard let pairingFile else {
+                throw DeviceTransportError.pairingFileReadFailed("empty pairing handle")
+            }
 
-        var address = endpoint.sockaddr
-        var tunnel = RPPairingTunnel()
-        let ffiError = hostname.withCString { hostnamePointer in
-            withUnsafePointer(to: &address) { addressPointer in
-                addressPointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                    tunnel_create_rppairing(
-                        $0,
-                        socklen_t(MemoryLayout<sockaddr_in>.stride),
-                        hostnamePointer,
-                        pairingFile,
-                        nil,
-                        nil,
-                        &tunnel.adapter,
-                        &tunnel.handshake
-                    )
+            var address = endpoint.sockaddr
+            var tunnel = RPPairingTunnel()
+            let ffiError = hostname.withCString { hostnamePointer in
+                withUnsafePointer(to: &address) { addressPointer in
+                    addressPointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                        tunnel_create_rppairing(
+                            $0,
+                            socklen_t(MemoryLayout<sockaddr_in>.stride),
+                            hostnamePointer,
+                            pairingFile,
+                            nil,
+                            nil,
+                            &tunnel.adapter,
+                            &tunnel.handshake
+                        )
+                    }
                 }
             }
+
+            if let ffiError {
+                let message = consumeFFIError(ffiError, fallback: "unknown RPPairing error")
+                tunnel.free()
+                rp_pairing_file_free(pairingFile)
+
+                if attempt + 1 < RPPairingRecoveryPolicy.maximumAttempts,
+                   RPPairingRecoveryPolicy.shouldRetry(message) {
+                    recoveryRetried = true
+                    Thread.sleep(forTimeInterval: RPPairingRecoveryPolicy.retryDelay)
+                    continue
+                }
+
+                throw DeviceTransportError.ffiFailure(
+                    "\(message) [target \(endpoint.ip):\(endpoint.port)]."
+                        + RPPairingRecoveryPolicy.failureSuffix(
+                            for: message,
+                            recoveryRetried: recoveryRetried
+                        )
+                )
+            }
+
+            guard tunnel.adapter != nil, tunnel.handshake != nil else {
+                tunnel.free()
+                rp_pairing_file_free(pairingFile)
+                throw DeviceTransportError.incompleteTunnel
+            }
+
+            rp_pairing_file_free(pairingFile)
+            return tunnel
         }
 
-        if let ffiError {
-            let message = consumeFFIError(ffiError, fallback: "unknown RPPairing error")
-            tunnel.free()
-            throw DeviceTransportError.ffiFailure(
-                "\(message) [target \(endpoint.ip):\(endpoint.port)]. The pairing file was read successfully; make sure the embedded VPN is connected and the target device tunnel is listening."
-            )
-        }
-
-        guard tunnel.adapter != nil, tunnel.handshake != nil else {
-            tunnel.free()
-            throw DeviceTransportError.incompleteTunnel
-        }
-
-        return tunnel
+        throw DeviceTransportError.ffiFailure(
+            "RPPairing recovery exhausted [target \(endpoint.ip):\(endpoint.port)]."
+                + RPPairingRecoveryPolicy.failureSuffix(
+                    for: "Connection reset by peer",
+                    recoveryRetried: recoveryRetried
+                )
+        )
     }
 
     private func consumeFFIError(

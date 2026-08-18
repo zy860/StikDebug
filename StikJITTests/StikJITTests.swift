@@ -32,6 +32,23 @@ struct StikJITTests {
         #expect(message.localizedCaseInsensitiveContains("vpn"))
     }
 
+    @Test func rppairingRecoveryRetriesOnlyTransientPeerResets() {
+        #expect(RPPairingRecoveryPolicy.shouldRetry("Connection reset by peer"))
+        #expect(RPPairingRecoveryPolicy.shouldRetry("os error 54"))
+        #expect(!RPPairingRecoveryPolicy.shouldRetry("Connection refused (os error 61)"))
+        #expect(!RPPairingRecoveryPolicy.shouldRetry("PairVerifyFailed"))
+    }
+
+    @Test func rppairingRecoveryMessageIdentifiesHandshakeBoundary() {
+        let message = RPPairingRecoveryPolicy.failureSuffix(
+            for: "Socket(Os { code: 54, kind: ConnectionReset, message: \"Connection reset by peer\" })"
+        )
+
+        #expect(message.localizedCaseInsensitiveContains("handshake"))
+        #expect(message.localizedCaseInsensitiveContains("VPN route reached the device"))
+        #expect(message.localizedCaseInsensitiveContains("pairing file"))
+    }
+
     @Test func locationSimulationClassifiesTransportFailuresSeparately() {
         #expect(LocationSimulationStatus.code(for: .vpnUnavailable("permission denied")) == 3)
         #expect(LocationSimulationStatus.code(for: .ffiFailure("connection refused")) == 13)
