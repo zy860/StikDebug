@@ -42,7 +42,21 @@ jobs:
             SWIFT_OPTIMIZATION_LEVEL="-Onone" \
             IPHONEOS_DEPLOYMENT_TARGET=17.4
 
-      - name: 4. Package .app into .ipa
+      - name: 4. Validate embedded Network Extension
+        run: |
+          APP="build/StikDebug.xcarchive/Products/Applications/StikDebug.app"
+          EXT="$APP/PlugIns/StikDebugTunnel.appex"
+          test -f "$APP/Info.plist"
+          test -f "$EXT/Info.plist"
+          test -x "$APP/StikDebug"
+          test -x "$EXT/StikDebugTunnel"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$EXT/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundlePackageType" "$EXT/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :NSExtension:NSExtensionPointIdentifier" "$EXT/Info.plist"
+          file "$APP/StikDebug" | grep -q "Mach-O"
+          file "$EXT/StikDebugTunnel" | grep -q "Mach-O"
+
+      - name: 5. Package .app into .ipa
         run: |
           TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
           IPA_NAME="StikDebug-${TIMESTAMP}.ipa"
@@ -53,7 +67,7 @@ jobs:
           rm -rf Payload StikDebug.app
           echo "IPA_NAME=${IPA_NAME}" >> $GITHUB_ENV
 
-      - name: 5. Store IPA as Workflow Artifact
+      - name: 6. Store IPA as Workflow Artifact
         if: env.UPLOAD_IPA == 'true'
         uses: actions/upload-artifact@v4
         with:
@@ -61,13 +75,13 @@ jobs:
           path: ${{ env.IPA_NAME }}
           retention-days: 90
 
-      - name: 6. Extract Version Information
+      - name: 7. Extract Version Information
         id: version
         run: |
           VERSION=$(sed -n 's/.*MARKETING_VERSION = \(.*\);/\1/p' StikDebug.xcodeproj/project.pbxproj | head -1 | xargs)
           echo "app_version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: 7. Deploy to Nightly Release
+      - name: 8. Deploy to Nightly Release
         if: env.UPLOAD_IPA == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:

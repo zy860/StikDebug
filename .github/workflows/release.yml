@@ -41,7 +41,21 @@ jobs:
             SWIFT_OPTIMIZATION_LEVEL="-Onone" \
             IPHONEOS_DEPLOYMENT_TARGET=17.4
 
-      - name: 4. Package .app into .ipa
+      - name: 4. Validate embedded Network Extension
+        run: |
+          APP="build/StikDebug.xcarchive/Products/Applications/StikDebug.app"
+          EXT="$APP/PlugIns/StikDebugTunnel.appex"
+          test -f "$APP/Info.plist"
+          test -f "$EXT/Info.plist"
+          test -x "$APP/StikDebug"
+          test -x "$EXT/StikDebugTunnel"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$EXT/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundlePackageType" "$EXT/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :NSExtension:NSExtensionPointIdentifier" "$EXT/Info.plist"
+          file "$APP/StikDebug" | grep -q "Mach-O"
+          file "$EXT/StikDebugTunnel" | grep -q "Mach-O"
+
+      - name: 5. Package .app into .ipa
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           IPA_NAME="StikDebug-${VERSION}.ipa"
@@ -53,7 +67,7 @@ jobs:
           echo "IPA_NAME=${IPA_NAME}" >> $GITHUB_ENV
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-      - name: 5. Create GitHub Release
+      - name: 6. Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
