@@ -42,10 +42,10 @@ Add tests to `StikJITTests/StikJITTests.swift`:
 @Test func embeddedTunnelDefaultsMatchLocalDevVPNEndpoint() {
     let configuration = StikDebugTunnelConfiguration.default
 
-    #expect(configuration.interfaceIP == "10.7.0.0")
+    #expect(configuration.interfaceIP == "10.7.1.1")
     #expect(configuration.peerIP == "10.7.0.1")
     #expect(configuration.peerPrefixLength == 32)
-    #expect(configuration.providerConfiguration["interfaceIP"] == "10.7.0.0")
+    #expect(configuration.providerConfiguration["interfaceIP"] == "10.7.1.1")
     #expect(configuration.providerConfiguration["peerIP"] == "10.7.0.1")
 }
 
@@ -82,7 +82,7 @@ Expected: compilation failure identifying the missing `StikDebugTunnelConfigurat
 
 - [ ] **Step 3: Implement the minimal pure types.**
 
-`StikDebugTunnelConfiguration` must store `interfaceIP`, `peerIP`, and `peerPrefixLength`, expose the constants `interfaceIPKey = "interfaceIP"` and `peerIPKey = "peerIP"`, and build a `[String: String]` provider dictionary. Its default must be interface `10.7.0.0`, peer `10.7.0.1`, prefix `32`.
+`StikDebugTunnelConfiguration` must store `interfaceIP`, `peerIP`, and `peerPrefixLength`, expose the constants `interfaceIPKey = "interfaceIP"` and `peerIPKey = "peerIP"`, and build a `[String: String]` provider dictionary. Its default must be interface `10.7.1.1`, peer `10.7.0.1`, prefix `32`.
 
 `IPv4PacketRewriter.swapEndpoints` must return without modifying packets shorter than 20 bytes and must swap bytes 12–15 with bytes 16–19 for every IPv4 packet delivered by the peer-only route. It must not parse or rewrite IPv6 packets. This intentionally matches LocalDevVPN's packet loop; the route restriction ensures only loopback peer traffic enters the loop.
 
@@ -200,7 +200,7 @@ Add pure tests:
         for: .default
     )
 
-    #expect(configuration[StikDebugTunnelConfiguration.interfaceIPKey] == "10.7.0.0")
+    #expect(configuration[StikDebugTunnelConfiguration.interfaceIPKey] == "10.7.1.1")
     #expect(configuration[StikDebugTunnelConfiguration.peerIPKey] == "10.7.0.1")
     #expect(StikDebugVPNManager.providerBundleIdentifier == "com.stik.stikdebug.tunnel")
 }

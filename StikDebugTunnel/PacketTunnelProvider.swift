@@ -30,7 +30,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
         let ipv4Settings = NEIPv4Settings(
             addresses: [interfaceIP],
-            subnetMasks: ["255.255.255.0"]
+            subnetMasks: ["255.255.255.255"]
         )
         ipv4Settings.includedRoutes = [
             NEIPv4Route(

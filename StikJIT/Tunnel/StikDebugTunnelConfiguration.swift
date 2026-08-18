@@ -8,7 +8,7 @@ struct StikDebugTunnelConfiguration: Equatable {
     static let peerIPKey = "peerIP"
 
     static let `default` = StikDebugTunnelConfiguration(
-        interfaceIP: "10.7.0.0",
+        interfaceIP: "10.7.1.1",
         peerIP: "10.7.0.1"
     )
 

@@ -38,7 +38,7 @@ Add `StikDebugVPNManager` in the main app. It owns one `NETunnelProviderManager`
 - `status` derived from `NEVPNStatus`.
 - `isTunnelReady()` for non-UI callers.
 
-The manager uses `providerConfiguration` for the interface IP and peer IP, defaults to interface `10.7.0.0` and peer `10.7.0.1`, and configures an on-demand rule only for the peer address. It must not require WiFi or enable a full-device default route. Existing VPNs are not silently destroyed; if another VPN is active, the manager reports a clear conflict and waits for the user to stop it.
+The manager uses `providerConfiguration` for the interface IP and peer IP, defaults to interface `10.7.1.1` and peer `10.7.0.1`, and configures a peer-only route. It must not require WiFi or enable a full-device default route. Existing VPNs are not silently destroyed; if another VPN is active, the manager reports a clear conflict and waits for the user to stop it.
 
 The app group is reserved for shared tunnel configuration and diagnostics. Pairing files remain in the existing app-owned store unless the extension later needs them; the Packet Tunnel itself does not read pairing material.
 
@@ -105,7 +105,7 @@ StikDebugVPNManager.prepare/start
         |
         v
 StikDebugTunnel PacketTunnelProvider
-  10.7.0.0 interface, route 10.7.0.1/32
+  10.7.1.1/32 interface, route 10.7.0.1/32
         |
         v
 JITEnableContext.ensureReady
