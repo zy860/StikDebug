@@ -14,7 +14,7 @@ env:
 jobs:
   release:
     name: Build & Release IPA
-    runs-on: macos-latest
+    runs-on: macos-15
 
     steps:
       - name: 1. Fetch Source Code

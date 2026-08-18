@@ -430,6 +430,45 @@ private enum CoordinateImportParser {
         sanitized(parseTextCoordinates(from: text))
     }
 
+    /// 从地图分享链接或坐标文本解析单个坐标点
+    /// 支持: Apple Maps (ll=/coordinate=/@), 高德 (p=, q=), Google/Baidu, 纯坐标文本
+    static func parseMapLink(_ text: String) -> CLLocationCoordinate2D? {
+        let pattern = #"[-+]?\d{1,3}\.\d{4,}"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        let matches = regex.matches(in: text, range: range)
+        guard matches.count >= 2 else { return nil }
+
+        let nums: [Double] = matches.compactMap { match in
+            guard let r = Range(match.range, in: text) else { return nil }
+            return Double(text[r])
+        }
+        guard nums.count >= 2 else { return nil }
+
+        let lower = text.lowercased()
+        let isAmap = lower.contains("amap") || lower.contains("uri.amap") || lower.contains("s.url.cn")
+        let isApple = lower.contains("maps.apple") || lower.contains("coordinate=")
+
+        if isAmap || isApple {
+            // Amap/Apple maps in China use GCJ-02: first is lat, second is lon
+            return CLLocationCoordinate2D(latitude: nums[0], longitude: nums[1])
+        }
+        // 纯文本或 Google 等其他来源: 小的是纬度, 大的是经度
+        let lat: Double, lon: Double
+        if abs(nums[0]) <= 90 && abs(nums[1]) > 90 {
+            lat = nums[0]
+            lon = nums[1]
+        } else if abs(nums[1]) <= 90 && abs(nums[0]) > 90 {
+            lat = nums[1]
+            lon = nums[0]
+        } else {
+            lat = nums[0]
+            lon = nums[1]
+        }
+        let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        return CLLocationCoordinate2DIsValid(coord) ? coord : nil
+    }
+
     private static func decodedText(from data: Data) -> String? {
         String(data: data, encoding: .utf8)
             ?? String(data: data, encoding: .utf16)
@@ -752,6 +791,7 @@ struct LocationSimulationView: View {
     @State private var routePlaybackCoordinate: CLLocationCoordinate2D?
     @State private var simulatedCoordinate: CLLocationCoordinate2D?
     @State private var routeRequestID = UUID()
+    @State private var assumeGCJ02 = true
 
     private static let routeDurationFormatter: DateComponentsFormatter = {
         let formatter = DateComponentsFormatter()
@@ -965,13 +1005,22 @@ struct LocationSimulationView: View {
                 }
                 .disabled(isBusy || isRouteRunning)
 
-                Button {
-                    showCoordinateImporter = true
+                Menu {
+                    Button {
+                        showCoordinateImporter = true
+                    } label: {
+                        Label("Import Coordinates", systemImage: "square.and.arrow.down")
+                    }
+                    .disabled(isBusy || isRouteRunning || isImportingCoordinates)
+                    
+                    Divider()
+                    
+                    Toggle(isOn: $assumeGCJ02) {
+                        Label("GCJ-02 (高德/腾讯)", systemImage: "mappin.and.ellipse")
+                    }
                 } label: {
                     Image(systemName: "square.and.arrow.down")
                 }
-                .disabled(isBusy || isRouteRunning || isImportingCoordinates)
-                .accessibilityLabel("Import Coordinates")
             }
             ToolbarItem(placement: .topBarTrailing) {
                 TextField("Search location...", text: $searchText)
@@ -999,13 +1048,18 @@ struct LocationSimulationView: View {
             Text("Enter a name for this location.")
         }
         .sheet(isPresented: $showBookmarks) {
-            BookmarksView(bookmarks: $bookmarks) { bookmark in
-                applySelection(bookmark.coordinate)
-                showBookmarks = false
-            } onDelete: { offsets in
-                bookmarks.remove(atOffsets: offsets)
-                saveBookmarks()
-            }
+            BookmarksView(
+                bookmarks: $bookmarks,
+                onSelect: { bookmark in
+                    applySelection(bookmark.coordinate)
+                    showBookmarks = false
+                },
+                onDelete: { offsets in
+                    bookmarks.remove(atOffsets: offsets)
+                    saveBookmarks()
+                },
+                activeCoordinate: simulatedCoordinate
+            )
         }
         .sheet(isPresented: $showRouteSearch) {
             RouteSearchSheet(
@@ -1026,6 +1080,9 @@ struct LocationSimulationView: View {
         }
         .onAppear {
             loadBookmarks()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                tryRestoreLastSimulatedLocation()
+            }
         }
         .onDisappear {
             routeLoadTask?.cancel()
@@ -1096,7 +1153,21 @@ struct LocationSimulationView: View {
     }
 
     private func applyCoordinatesFromSearchText() {
-        let importedCoordinates = CoordinateImportParser.parseInline(searchText)
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        // 先尝试解析地图链接（Apple Maps / 高德 / 百度 分享链接）
+        if trimmed.contains("://") || trimmed.contains("maps.") || trimmed.contains("amap") {
+            if let linkCoord = CoordinateImportParser.parseMapLink(trimmed) {
+                searchText = ""
+                searchCompleter.results = []
+                applySelection(linkCoord)
+                return
+            }
+        }
+
+        // 再尝试解析纯文本坐标 / CSV / GPX 格式
+        let importedCoordinates = CoordinateImportParser.parseInline(trimmed)
         guard !importedCoordinates.isEmpty else { return }
 
         searchText = ""
@@ -1142,9 +1213,14 @@ struct LocationSimulationView: View {
     ) {
         guard !isRouteRunning else { return }
 
-        let coordinates = CoordinateTransform.wgs84ToGCJ02(
-            importedCoordinates.filter(CLLocationCoordinate2DIsValid)
-        )
+        let validCoordinates = importedCoordinates.filter(CLLocationCoordinate2DIsValid)
+        let coordinates: [CLLocationCoordinate2D]
+        
+        if assumeGCJ02 {
+            coordinates = validCoordinates
+        } else {
+            coordinates = CoordinateTransform.wgs84ToGCJ02(validCoordinates)
+        }
         guard let firstCoordinate = coordinates.first else {
             showImportError(CoordinateImportError.noCoordinates)
             return
@@ -1302,6 +1378,7 @@ struct LocationSimulationView: View {
             beginBackgroundTask()
             startResendLoop(with: coord)
             BackgroundLocationManager.shared.requestStart()
+            saveLastSimulatedCoordinate(coord)
         }
     }
 
@@ -1326,6 +1403,7 @@ struct LocationSimulationView: View {
             simulatedCoordinate = nil
             routePlaybackCoordinate = firstCoordinate
             startRoutePlayback()
+            saveLastSimulatedCoordinate(firstCoordinate)
         }
     }
 
@@ -1366,6 +1444,7 @@ struct LocationSimulationView: View {
         ) {
             endBackgroundTask()
             BackgroundLocationManager.shared.requestStop()
+            clearLastSimulatedCoordinate()
         }
     }
 
@@ -1567,6 +1646,38 @@ struct LocationSimulationView: View {
             LocationSimulationCommandQueue.shared.async {
                 continuation.resume(returning: locationUpdateCode(for: coordinate))
             }
+        }
+    }
+
+    // MARK: - Auto Persistence
+
+    private func saveLastSimulatedCoordinate(_ coordinate: CLLocationCoordinate2D) {
+        UserDefaults.standard.set(coordinate.latitude, forKey: UserDefaults.Keys.lastSimulatedLatitude)
+        UserDefaults.standard.set(coordinate.longitude, forKey: UserDefaults.Keys.lastSimulatedLongitude)
+    }
+
+    private func clearLastSimulatedCoordinate() {
+        UserDefaults.standard.removeObject(forKey: UserDefaults.Keys.lastSimulatedLatitude)
+        UserDefaults.standard.removeObject(forKey: UserDefaults.Keys.lastSimulatedLongitude)
+    }
+
+    private func tryRestoreLastSimulatedLocation() {
+        let lat = UserDefaults.standard.double(forKey: UserDefaults.Keys.lastSimulatedLatitude)
+        let lon = UserDefaults.standard.double(forKey: UserDefaults.Keys.lastSimulatedLongitude)
+        guard lat != 0, lon != 0 else { return }
+        let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        guard CLLocationCoordinate2DIsValid(coord) else { return }
+        coordinate = coord
+        guard pairingExists, !isBusy else { return }
+        runLocationCommand(
+            errorTitle: "Auto-Restore Failed",
+            errorMessage: { code in "Could not restore location (error \(code))." },
+            operation: { locationUpdateCode(for: coord) }
+        ) {
+            routePlaybackCoordinate = nil
+            beginBackgroundTask()
+            startResendLoop(with: coord)
+            BackgroundLocationManager.shared.requestStart()
         }
     }
 
@@ -1823,6 +1934,14 @@ struct BookmarksView: View {
     @Binding var bookmarks: [LocationBookmark]
     let onSelect: (LocationBookmark) -> Void
     let onDelete: (IndexSet) -> Void
+    let activeCoordinate: CLLocationCoordinate2D?
+
+    private func isActive(_ bookmark: LocationBookmark) -> Bool {
+        guard let active = activeCoordinate else { return false }
+        let latDiff = abs(bookmark.latitude - active.latitude)
+        let lonDiff = abs(bookmark.longitude - active.longitude)
+        return latDiff < 1e-6 && lonDiff < 1e-6
+    }
 
     var body: some View {
         NavigationStack {
@@ -1840,8 +1959,18 @@ struct BookmarksView: View {
                                 onSelect(bookmark)
                             } label: {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(bookmark.name)
-                                        .foregroundStyle(.primary)
+                                    HStack {
+                                        Text(bookmark.name)
+                                            .foregroundStyle(.primary)
+                                        if isActive(bookmark) {
+                                            Text("✓ 当前生效")
+                                                .font(.caption2.weight(.medium))
+                                                .foregroundStyle(.green)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(.green.opacity(0.12), in: Capsule())
+                                        }
+                                    }
                                     Text(String(format: "%.6f, %.6f", bookmark.latitude, bookmark.longitude))
                                         .font(.caption.monospaced())
                                         .foregroundStyle(.secondary)

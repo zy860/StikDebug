@@ -13,7 +13,7 @@ permissions:
 jobs:
   build_and_release:
     name: Build & Release IPA
-    runs-on: macos-latest  
+    runs-on: macos-15  
     env:
       UPLOAD_IPA: ${{ vars.UPLOAD_IPA || 'true' }}
 
