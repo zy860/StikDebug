@@ -39,17 +39,17 @@ cargo build \
 cp "${SOURCE_DIR}/ffi/idevice.h" "${OUTPUT_DIR}/idevice.h"
 cp "${SOURCE_DIR}/target/${TARGET}/release/libidevice_ffi.a" "${OUTPUT_DIR}/libidevice_ffi.a"
 
-if ! nm -gU "${OUTPUT_DIR}/libidevice_ffi.a" | grep -q 'pairable_host_accept'; then
+if ! grep -a -q 'pairable_host_accept' "${OUTPUT_DIR}/libidevice_ffi.a"; then
     echo "rebuilt idevice FFI does not export pairable_host_accept" >&2
     exit 1
 fi
 
-if ! nm -gU "${OUTPUT_DIR}/libidevice_ffi.a" | grep -q 'syslog_relay_connect_rsd'; then
+if ! grep -a -q 'syslog_relay_connect_rsd' "${OUTPUT_DIR}/libidevice_ffi.a"; then
     echo "rebuilt idevice FFI does not export syslog_relay_connect_rsd" >&2
     exit 1
 fi
 
-if ! nm -gU "${OUTPUT_DIR}/libidevice_ffi.a" | grep -q 'syslog_relay_next'; then
+if ! grep -a -q 'syslog_relay_next' "${OUTPUT_DIR}/libidevice_ffi.a"; then
     echo "rebuilt idevice FFI does not export syslog_relay_next" >&2
     exit 1
 fi
