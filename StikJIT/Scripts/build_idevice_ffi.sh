@@ -3,13 +3,17 @@ set -euo pipefail
 
 # This revision is the first upstream revision that exposes the iOS 27
 # pairable-host FFI. Building with the `full` feature set also keeps the
-# syslog relay exports used by JITEnableContext.swift.
+# syslog relay exports used by JITEnableContext.swift. The ring backend is
+# used because aws-lc's iOS arm64 build requires an unavailable stack-check
+# runtime symbol on the Xcode 26 runner.
 readonly IDEVICE_REVISION="${IDEVICE_REVISION:-7bd551c16c6dd2e058740d85a2d9399a51a776e9}"
 readonly IDEVICE_REPOSITORY="${IDEVICE_REPOSITORY:-https://github.com/jkcoxson/idevice.git}"
 readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 readonly SOURCE_DIR="${IDEVICE_SOURCE_DIR:-${TMPDIR:-/tmp}/stikdebug-idevice-${IDEVICE_REVISION}}"
 readonly TARGET="aarch64-apple-ios"
 readonly OUTPUT_DIR="${PROJECT_ROOT}/StikJIT/idevice"
+
+export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-17.4}"
 
 if ! command -v cargo >/dev/null 2>&1; then
     echo "cargo is required to rebuild the bundled idevice FFI" >&2
@@ -30,7 +34,7 @@ cargo build \
     --release \
     --target "${TARGET}" \
     --no-default-features \
-    --features "full,aws-lc"
+    --features "full,ring"
 
 cp "${SOURCE_DIR}/ffi/idevice.h" "${OUTPUT_DIR}/idevice.h"
 cp "${SOURCE_DIR}/target/${TARGET}/release/libidevice_ffi.a" "${OUTPUT_DIR}/libidevice_ffi.a"
