@@ -10,6 +10,7 @@ readonly IDEVICE_REVISION="${IDEVICE_REVISION:-7bd551c16c6dd2e058740d85a2d9399a5
 readonly IDEVICE_REPOSITORY="${IDEVICE_REPOSITORY:-https://github.com/jkcoxson/idevice.git}"
 readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 readonly SOURCE_DIR="${IDEVICE_SOURCE_DIR:-${TMPDIR:-/tmp}/stikdebug-idevice-${IDEVICE_REVISION}}"
+readonly PAIRABLE_HOST_PATCH="${PROJECT_ROOT}/StikJIT/Scripts/idevice_pairable_host_callbacks.patch"
 readonly TARGET="aarch64-apple-ios"
 readonly OUTPUT_DIR="${PROJECT_ROOT}/StikJIT/idevice"
 
@@ -27,6 +28,14 @@ fi
 git -C "${SOURCE_DIR}" fetch --depth 1 origin "${IDEVICE_REVISION}"
 git -C "${SOURCE_DIR}" checkout --detach "${IDEVICE_REVISION}"
 
+# The upstream FFI advertises directly with mdns-sd and exposes a shorter
+# pairable_host_accept ABI. iOS needs Network.framework to publish the Bonjour
+# service and relay the device connection to the loopback listener, so apply
+# the same callback ABI used by the bundled Locus header and Swift code.
+if ! grep -q 'PairableHostListeningCallback' "${SOURCE_DIR}/ffi/src/pairable_host.rs"; then
+    git -C "${SOURCE_DIR}" apply "${PAIRABLE_HOST_PATCH}"
+fi
+
 rustup target add "${TARGET}"
 cargo build \
     --manifest-path "${SOURCE_DIR}/ffi/Cargo.toml" \
@@ -38,6 +47,16 @@ cargo build \
 
 cp "${SOURCE_DIR}/ffi/idevice.h" "${OUTPUT_DIR}/idevice.h"
 cp "${SOURCE_DIR}/target/${TARGET}/release/libidevice_ffi.a" "${OUTPUT_DIR}/libidevice_ffi.a"
+
+if ! grep -q 'PairableHostListeningCallback' "${OUTPUT_DIR}/idevice.h"; then
+    echo "rebuilt idevice header does not expose the pairable-host listening callback ABI" >&2
+    exit 1
+fi
+
+if ! grep -q 'PairableHostConnectedCallback' "${OUTPUT_DIR}/idevice.h"; then
+    echo "rebuilt idevice header does not expose the pairable-host connected callback ABI" >&2
+    exit 1
+fi
 
 if ! grep -a -q 'pairable_host_accept' "${OUTPUT_DIR}/libidevice_ffi.a"; then
     echo "rebuilt idevice FFI does not export pairable_host_accept" >&2
