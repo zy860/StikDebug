@@ -7,11 +7,29 @@
 import Foundation
 import UniformTypeIdentifiers
 import UIKit
+import idevice
 
 enum AccessibilityAnnouncer {
     static func announce(_ message: String) {
         DispatchQueue.main.async {
             UIAccessibility.post(notification: .announcement, argument: message)
+        }
+    }
+}
+
+enum PairingFileStoreError: LocalizedError, Equatable {
+    case validationFailed
+    case sourceMissing
+    case commitFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .validationFailed:
+            return "The generated pairing file could not be validated."
+        case .sourceMissing:
+            return "The generated pairing file is missing."
+        case .commitFailed(let message):
+            return "The generated pairing file could not be saved: \(message)"
         }
     }
 }
@@ -78,6 +96,74 @@ enum PairingFileStore {
         }
 
         try replace(with: sourceURL, fileManager: fileManager)
+    }
+
+    static func commitGeneratedPairingFile(
+        sourceURL: URL,
+        fileManager: FileManager = .default,
+        destinationURL: URL = PairingFileStore.url,
+        validator: (URL) throws -> Void = PairingFileStore.validateRPPairingFile
+    ) throws {
+        guard fileManager.fileExists(atPath: sourceURL.path) else {
+            throw PairingFileStoreError.sourceMissing
+        }
+
+        let directoryURL = destinationURL.deletingLastPathComponent()
+        try fileManager.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true
+        )
+
+        let temporaryURL = directoryURL.appendingPathComponent(
+            ".\(destinationURL.lastPathComponent).\(UUID().uuidString).tmp"
+        )
+        defer { try? fileManager.removeItem(at: temporaryURL) }
+
+        do {
+            try fileManager.copyItem(at: sourceURL, to: temporaryURL)
+            try validator(temporaryURL)
+            try fileManager.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: temporaryURL.path
+            )
+
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                _ = try fileManager.replaceItemAt(
+                    destinationURL,
+                    withItemAt: temporaryURL,
+                    backupItemName: nil,
+                    options: .usingNewMetadataOnly
+                )
+            } else {
+                try fileManager.moveItem(at: temporaryURL, to: destinationURL)
+            }
+        } catch let error as PairingFileStoreError {
+            throw error
+        } catch {
+            throw PairingFileStoreError.commitFailed(error.localizedDescription)
+        }
+    }
+
+    private static func validateRPPairingFile(_ url: URL) throws {
+        var pairingFile: RpPairingFileHandle?
+        let ffiError = url.path.withCString { path in
+            rp_pairing_file_read(path, &pairingFile)
+        }
+        defer {
+            if let pairingFile {
+                rp_pairing_file_free(pairingFile)
+            }
+        }
+
+        guard let ffiError else {
+            guard pairingFile != nil else {
+                throw PairingFileStoreError.validationFailed
+            }
+            return
+        }
+
+        idevice_error_free(ffiError)
+        throw PairingFileStoreError.validationFailed
     }
 
     static func remove(fileManager: FileManager = .default) throws {
