@@ -18,6 +18,7 @@ final class PairableHostAdvertiser {
     private var activeRelayID: UUID?
     private var rustLoopbackPort: UInt16 = 0
     private var stateGeneration = UUID()
+    private var wakeConnection: NWConnection?
     private let queue = DispatchQueue(label: "com.stik.stikdebug.pairable-relay")
 
     private var activeRelayState = false
@@ -81,16 +82,19 @@ final class PairableHostAdvertiser {
         let relay = activeRelay
         let currentListener = listener
         let portToWake = rustLoopbackPort
+        let currentWake = wakeConnection
         activeRelay = nil
         activeRelayID = nil
         activeRelayState = false
         listener = nil
         stateGeneration = UUID()
+        wakeConnection = nil
         rustLoopbackPort = 0
         stateLock.unlock()
 
         relay?.cancel()
         currentListener?.cancel()
+        currentWake?.cancel()
         wakeRustListener(on: portToWake)
     }
 
@@ -142,15 +146,30 @@ final class PairableHostAdvertiser {
             port: port,
             using: .tcp
         )
-        wake.stateUpdateHandler = { [weak wake] state in
+        wake.stateUpdateHandler = { [weak self] state in
             switch state {
             case .ready, .failed, .cancelled:
-                wake?.cancel()
+                wake.stateUpdateHandler = nil
+                self?.finishWake(wake)
+                wake.cancel()
             default:
                 break
             }
         }
+        stateLock.lock()
+        let previousWake = wakeConnection
+        wakeConnection = wake
+        stateLock.unlock()
+        previousWake?.cancel()
         wake.start(queue: queue)
+    }
+
+    private func finishWake(_ connection: NWConnection) {
+        stateLock.lock()
+        if wakeConnection === connection {
+            wakeConnection = nil
+        }
+        stateLock.unlock()
     }
 
     private func clearRelay(id: UUID) {
