@@ -17,6 +17,7 @@ final class PairableHostAdvertiser {
     private var activeRelay: RelayPipe?
     private var activeRelayID: UUID?
     private var rustLoopbackPort: UInt16 = 0
+    private var stateGeneration = UUID()
     private let queue = DispatchQueue(label: "com.stik.stikdebug.pairable-relay")
 
     private var activeRelayState = false
@@ -34,6 +35,7 @@ final class PairableHostAdvertiser {
         stop()
         stateLock.lock()
         rustLoopbackPort = metadata.port
+        stateGeneration = UUID()
         stateLock.unlock()
 
         var txtRecord = NWTXTRecord()
@@ -78,21 +80,25 @@ final class PairableHostAdvertiser {
         stateLock.lock()
         let relay = activeRelay
         let currentListener = listener
+        let portToWake = rustLoopbackPort
         activeRelay = nil
         activeRelayID = nil
         activeRelayState = false
         listener = nil
+        stateGeneration = UUID()
         rustLoopbackPort = 0
         stateLock.unlock()
 
         relay?.cancel()
         currentListener?.cancel()
+        wakeRustListener(on: portToWake)
     }
 
     private func accept(_ inbound: NWConnection) {
         stateLock.lock()
         let previousRelay = activeRelay
         let portValue = rustLoopbackPort
+        let generationValue = stateGeneration
         activeRelay = nil
         activeRelayID = nil
         activeRelayState = false
@@ -115,11 +121,36 @@ final class PairableHostAdvertiser {
             self?.clearRelay(id: relayID)
         }
         stateLock.lock()
+        guard stateGeneration == generationValue,
+              rustLoopbackPort == portValue else {
+            stateLock.unlock()
+            relay.cancel()
+            return
+        }
         activeRelay = relay
         activeRelayID = relayID
         activeRelayState = true
         stateLock.unlock()
         relay.start()
+    }
+
+    private func wakeRustListener(on portValue: UInt16) {
+        guard portValue > 0,
+              let port = NWEndpoint.Port(rawValue: portValue) else { return }
+        let wake = NWConnection(
+            host: NWEndpoint.Host("127.0.0.1"),
+            port: port,
+            using: .tcp
+        )
+        wake.stateUpdateHandler = { [weak wake] state in
+            switch state {
+            case .ready, .failed, .cancelled:
+                wake?.cancel()
+            default:
+                break
+            }
+        }
+        wake.start(queue: queue)
     }
 
     private func clearRelay(id: UUID) {

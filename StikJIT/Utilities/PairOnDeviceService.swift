@@ -134,6 +134,8 @@ final class PairOnDeviceService: ObservableObject {
 
     fileprivate func handleFailure(generation: UUID, message: String) {
         guard generation == self.generation else { return }
+        self.generation = UUID()
+        activeBox?.cancel()
         advertiser.stop()
         endKeepAlive()
         pin = nil
