@@ -97,6 +97,16 @@ struct SettingsView: View {
                     }
                 }
 
+                if #available(iOS 27.0, *) {
+                    Section("On-Device Pairing".localized) {
+                        NavigationLink {
+                            PairOnDeviceView()
+                        } label: {
+                            Label("Get Pairing File on This iPhone".localized, systemImage: "iphone.gen3")
+                        }
+                    }
+                }
+
                 Section("Embedded VPN".localized) {
                     HStack {
                         Label(vpnStatusTitle.localized, systemImage: vpnStatusIcon)

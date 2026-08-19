@@ -1870,6 +1870,118 @@
           }
         }
       }
+    },
+    "On-Device Pairing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "On-Device Pairing" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本机配对" } }
+      }
+    },
+    "Get Pairing File on This iPhone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Get Pairing File on This iPhone" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在本机获取配对文件" } }
+      }
+    },
+    "On iOS 27, open Settings > Privacy & Security > Developer Mode > Pair on this iPhone on the target device, then enter the PIN shown here." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "On iOS 27, open Settings > Privacy & Security > Developer Mode > Pair on this iPhone on the target device, then enter the PIN shown here." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 iOS 27 目标设备上打开“设置 > 隐私与安全性 > 开发者模式 > 在此 iPhone 上配对”，然后输入这里显示的 PIN。" } }
+      }
+    },
+    "Status" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Status" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "状态" } }
+      }
+    },
+    "Pairing PIN" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pairing PIN" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配对 PIN" } }
+      }
+    },
+    "Host Port" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Host Port" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主机端口" } }
+      }
+    },
+    "Pairing file saved. You can now use the existing device features." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pairing file saved. You can now use the existing device features." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配对文件已保存，现在可以使用现有设备功能。" } }
+      }
+    },
+    "This only creates the pairing file. It does not connect or disconnect the embedded VPN." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This only creates the pairing file. It does not connect or disconnect the embedded VPN." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此功能只创建配对文件，不会连接或断开内置 VPN。" } }
+      }
+    },
+    "Ready" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ready" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "就绪" } }
+      }
+    },
+    "Waiting for target device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Waiting for target device" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "等待目标设备" } }
+      }
+    },
+    "Device connected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Device connected" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "设备已连接" } }
+      }
+    },
+    "Enter the PIN on the target device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enter the PIN on the target device" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在目标设备上输入 PIN" } }
+      }
+    },
+    "Pairing file ready" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pairing file ready" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配对文件已就绪" } }
+      }
+    },
+    "Pairing failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pairing failed" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配对失败" } }
+      }
+    },
+    "Stop Pairing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stop Pairing" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "停止配对" } }
+      }
+    },
+    "Start Pairing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start Pairing" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始配对" } }
+      }
     }
   },
   "version" : "1.0"
