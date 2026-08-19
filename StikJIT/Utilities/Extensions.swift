@@ -137,6 +137,10 @@ enum PairingFileStore {
             } else {
                 try fileManager.moveItem(at: temporaryURL, to: destinationURL)
             }
+            if destinationURL == PairingFileStore.url,
+               fileManager.fileExists(atPath: legacyURL.path) {
+                try? fileManager.removeItem(at: legacyURL)
+            }
         } catch let error as PairingFileStoreError {
             throw error
         } catch {

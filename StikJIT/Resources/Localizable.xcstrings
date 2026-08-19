@@ -1934,6 +1934,13 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "就绪" } }
       }
     },
+    "Stopping previous pairing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stopping previous pairing" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在停止上一次配对" } }
+      }
+    },
     "Waiting for target device" : {
       "extractionState" : "manual",
       "localizations" : {

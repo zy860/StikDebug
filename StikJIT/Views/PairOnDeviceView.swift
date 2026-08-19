@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PairOnDeviceView: View {
-    @StateObject private var service = PairOnDeviceService()
+    @StateObject private var service = PairOnDeviceService.shared
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -83,7 +83,7 @@ struct PairOnDeviceView: View {
     private var statusTitle: String {
         switch service.phase {
         case .idle:
-            return "Ready".localized
+            return service.isBusy ? "Stopping previous pairing".localized : "Ready".localized
         case .advertising:
             return "Waiting for target device".localized
         case .deviceConnected:

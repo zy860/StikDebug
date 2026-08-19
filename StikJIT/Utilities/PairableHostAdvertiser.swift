@@ -12,20 +12,29 @@ struct PairableHostMetadata: Equatable, Sendable {
 }
 
 final class PairableHostAdvertiser {
+    private let stateLock = NSLock()
     private var listener: NWListener?
     private var activeRelay: RelayPipe?
     private var activeRelayID: UUID?
     private var rustLoopbackPort: UInt16 = 0
     private let queue = DispatchQueue(label: "com.stik.stikdebug.pairable-relay")
 
-    private(set) var hasActiveRelay = false
+    private var activeRelayState = false
+
+    var hasActiveRelay: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return activeRelayState
+    }
 
     func start(
         metadata: PairableHostMetadata,
         onFailure: @escaping @Sendable (String) -> Void = { _ in }
     ) {
         stop()
+        stateLock.lock()
         rustLoopbackPort = metadata.port
+        stateLock.unlock()
 
         var txtRecord = NWTXTRecord()
         txtRecord["name"] = metadata.name
@@ -57,30 +66,41 @@ final class PairableHostAdvertiser {
                 self?.accept(connection)
             }
             listener.start(queue: queue)
+            stateLock.lock()
             self.listener = listener
+            stateLock.unlock()
         } catch {
             onFailure(error.localizedDescription)
         }
     }
 
     func stop() {
-        activeRelay?.cancel()
+        stateLock.lock()
+        let relay = activeRelay
+        let currentListener = listener
         activeRelay = nil
         activeRelayID = nil
-        hasActiveRelay = false
-        listener?.cancel()
+        activeRelayState = false
         listener = nil
         rustLoopbackPort = 0
+        stateLock.unlock()
+
+        relay?.cancel()
+        currentListener?.cancel()
     }
 
     private func accept(_ inbound: NWConnection) {
-        activeRelay?.cancel()
+        stateLock.lock()
+        let previousRelay = activeRelay
+        let portValue = rustLoopbackPort
         activeRelay = nil
         activeRelayID = nil
-        hasActiveRelay = false
+        activeRelayState = false
+        stateLock.unlock()
+        previousRelay?.cancel()
 
-        guard rustLoopbackPort > 0,
-              let port = NWEndpoint.Port(rawValue: rustLoopbackPort) else {
+        guard portValue > 0,
+              let port = NWEndpoint.Port(rawValue: portValue) else {
             inbound.cancel()
             return
         }
@@ -92,15 +112,23 @@ final class PairableHostAdvertiser {
         )
         let relayID = UUID()
         let relay = RelayPipe(inbound: inbound, outbound: outbound) { [weak self] in
-            guard let self, self.activeRelayID == relayID else { return }
-            self.activeRelay = nil
-            self.activeRelayID = nil
-            self.hasActiveRelay = false
+            self?.clearRelay(id: relayID)
         }
+        stateLock.lock()
         activeRelay = relay
         activeRelayID = relayID
-        hasActiveRelay = true
+        activeRelayState = true
+        stateLock.unlock()
         relay.start()
+    }
+
+    private func clearRelay(id: UUID) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard activeRelayID == id else { return }
+        activeRelay = nil
+        activeRelayID = nil
+        activeRelayState = false
     }
 }
 
@@ -109,6 +137,7 @@ private final class RelayPipe {
     private let outbound: NWConnection
     private let queue = DispatchQueue(label: "com.stik.stikdebug.pairable-pipe")
     private let onEnd: () -> Void
+    private let stateLock = NSLock()
     private var ended = false
 
     init(inbound: NWConnection, outbound: NWConnection, onEnd: @escaping () -> Void) {
@@ -143,17 +172,22 @@ private final class RelayPipe {
     }
 
     func cancel() {
-        guard !ended else { return }
+        stateLock.lock()
+        guard !ended else {
+            stateLock.unlock()
+            return
+        }
         ended = true
+        stateLock.unlock()
         inbound.cancel()
         outbound.cancel()
         onEnd()
     }
 
     private func pump(from source: NWConnection?, to destination: NWConnection?) {
-        guard let source, let destination, !ended else { return }
+        guard let source, let destination, !isEnded else { return }
         source.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
-            guard let self, !self.ended else { return }
+            guard let self, !self.isEnded else { return }
             if error != nil || isComplete {
                 self.cancel()
                 return
@@ -163,7 +197,7 @@ private final class RelayPipe {
                 return
             }
             destination.send(content: data, completion: .contentProcessed { [weak self] error in
-                guard let self, !self.ended else { return }
+                guard let self, !self.isEnded else { return }
                 if error != nil {
                     self.cancel()
                 } else {
@@ -171,5 +205,11 @@ private final class RelayPipe {
                 }
             })
         }
+    }
+
+    private var isEnded: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return ended
     }
 }

@@ -9,11 +9,14 @@ import idevice
 /// embedded VPN and it does not change the existing device transport.
 @MainActor
 final class PairOnDeviceService: ObservableObject {
+    static let shared = PairOnDeviceService()
+
     @Published private(set) var phase: PairOnDevicePhase = .idle
     @Published private(set) var pin: String?
     @Published private(set) var debugPort: UInt16?
 
     private var worker: Thread?
+    private var activeBox: PairCallbackBox?
     private var generation = UUID()
     private var backgroundTask = UIBackgroundTaskIdentifier.invalid
     private var keepAliveActive = false
@@ -46,11 +49,15 @@ final class PairOnDeviceService: ObservableObject {
             "." + PairingFileStore.fileName + "." + UUID().uuidString + ".generated"
         )
         let box = PairCallbackBox(owner: self, generation: currentGeneration)
+        activeBox = box
 
         let worker = Thread {
             autoreleasepool {
                 Self.runBlockingAccept(outputURL: outputURL, box: box)
                 try? FileManager.default.removeItem(at: outputURL)
+                Task { @MainActor [weak self] in
+                    self?.workerFinished(box)
+                }
             }
         }
         worker.name = "stikdebug.pairable-host"
@@ -61,10 +68,10 @@ final class PairOnDeviceService: ObservableObject {
 
     func stop() {
         generation = UUID()
+        activeBox?.cancel()
         advertiser.stop()
         endKeepAlive()
         worker?.cancel()
-        worker = nil
         phase = .idle
         pin = nil
         debugPort = nil
@@ -133,6 +140,12 @@ final class PairOnDeviceService: ObservableObject {
         phase = .failed(message)
     }
 
+    private func workerFinished(_ box: PairCallbackBox) {
+        guard activeBox === box else { return }
+        activeBox = nil
+        worker = nil
+    }
+
     private func beginKeepAlive() {
         UIApplication.shared.isIdleTimerDisabled = true
         BackgroundAudioManager.shared.requestStart()
@@ -186,6 +199,7 @@ final class PairOnDeviceService: ObservableObject {
         if let ffiError {
             let message = Self.ffiErrorMessage(ffiError)
             idevice_error_free(ffiError)
+            guard !box.isCancelled else { return }
             Self.dispatchFailure(box, message: message)
             return
         }
@@ -195,6 +209,7 @@ final class PairOnDeviceService: ObservableObject {
             return
         }
         defer { rp_pairing_file_free(pairingFile) }
+        guard !box.isCancelled else { return }
 
         let writeError = outputURL.path.withCString { path in
             rp_pairing_file_write(pairingFile, path)
@@ -206,6 +221,7 @@ final class PairOnDeviceService: ObservableObject {
             return
         }
 
+        guard !box.isCancelled else { return }
         do {
             try PairingFileStore.commitGeneratedPairingFile(sourceURL: outputURL)
         } catch {
@@ -245,12 +261,26 @@ final class PairOnDeviceService: ObservableObject {
 }
 
 private final class PairCallbackBox: @unchecked Sendable {
+    private let stateLock = NSLock()
     weak var owner: PairOnDeviceService?
     let generation: UUID
+    private var cancelled = false
 
     init(owner: PairOnDeviceService, generation: UUID) {
         self.owner = owner
         self.generation = generation
+    }
+
+    func cancel() {
+        stateLock.lock()
+        cancelled = true
+        stateLock.unlock()
+    }
+
+    var isCancelled: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return cancelled
     }
 }
 
@@ -260,6 +290,7 @@ private func pairOnDevicePINTrampoline(
 ) {
     guard let pin, let context else { return }
     let box = Unmanaged<PairCallbackBox>.fromOpaque(context).takeUnretainedValue()
+    guard !box.isCancelled else { return }
     let value = String(cString: pin)
     DispatchQueue.main.async {
         Task { @MainActor in
@@ -280,6 +311,7 @@ private func pairOnDeviceListeningTrampoline(
 ) {
     guard let context else { return }
     let box = Unmanaged<PairCallbackBox>.fromOpaque(context).takeUnretainedValue()
+    guard !box.isCancelled else { return }
     let values = (
         port,
         serviceIdentifier.map { String(cString: $0) } ?? "",
@@ -308,6 +340,7 @@ private func pairOnDeviceListeningTrampoline(
 private func pairOnDeviceConnectedTrampoline(context: UnsafeMutableRawPointer?) {
     guard let context else { return }
     let box = Unmanaged<PairCallbackBox>.fromOpaque(context).takeUnretainedValue()
+    guard !box.isCancelled else { return }
     DispatchQueue.main.async {
         Task { @MainActor in
             box.owner?.handleConnected(generation: box.generation)
