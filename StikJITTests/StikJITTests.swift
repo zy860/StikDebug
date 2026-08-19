@@ -39,6 +39,12 @@ struct StikJITTests {
         #expect(!RPPairingRecoveryPolicy.shouldRetry("PairVerifyFailed"))
     }
 
+    @Test func rppairingRecoveryRestartsVPNForDeadEndpointErrors() {
+        #expect(RPPairingRecoveryPolicy.needsVPNRestart("Connection refused (os error 61)"))
+        #expect(RPPairingRecoveryPolicy.needsVPNRestart("Connection reset by peer"))
+        #expect(!RPPairingRecoveryPolicy.needsVPNRestart("PairVerifyFailed"))
+    }
+
     @Test func rppairingRecoveryMessageIdentifiesHandshakeBoundary() {
         let message = RPPairingRecoveryPolicy.failureSuffix(
             for: "Socket(Os { code: 54, kind: ConnectionReset, message: \"Connection reset by peer\" })"
